@@ -1,0 +1,20 @@
+# lefthook.yml (at root)
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    lint-js:
+      glob: "services/gateway/**/*.{ts,tsx,js}"
+      run: pnpm -C services/gateway lint
+
+    lint-go:
+      glob: "*.go"
+      run: go vet ./...
+
+    format-go:
+      glob: "*.go"
+      run: gofmt -l {staged_files}
