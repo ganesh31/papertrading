@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.turbo
+.pnpm-store
+.bin
+dist
+**/dist
+build
+**/build
+db/schema.sql
+.git
+.github
+terminals
+agent-tools

@@ -1,0 +1,7 @@
+go 1.25.1
+
+use (
+  .
+  services/go/md
+  services/go/matching
+)

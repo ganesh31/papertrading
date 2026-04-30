@@ -1,0 +1,20 @@
+{
+  "name": "papertrading",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Equity-first paper trading system with plug-in asset modules.",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "check": "turbo run lint test build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
+  "devDependencies": {
+    "turbo": "^2.9.6"
+  }
+}
