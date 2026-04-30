@@ -33,6 +33,11 @@ Every request and event ultimately references an `instrument_id` which resolves 
 - `tradingConstraints`: `tickSize`, `lotSize`, `freezeQty`, price bands, product availability (CNC/MIS/NRML)
 - `contract`: optional derivative metadata (`expiry`, `strike`, `optionType`, `underlyingInstrumentId`, `lotSize`)
 
+#### Events: what to include vs. derive
+
+Core events and tables should store `instrument_id` as the durable identifier. Most context (`assetClass`, `segment`, `instrumentType`, constraints) is **derived** at read-time by resolving `instrument_id → InstrumentSpec` (cached).
+Duplicate fields can be included in event payloads for debugging/query ergonomics, but must be treated as **denormalized hints** (the source of truth remains `ref.instruments`).
+
 ### Asset module contracts (owned by domain, called by core)
 
 The core services depend on these contracts; the module implementation depends on reference data and (optionally) specialized engines like SPAN:
@@ -96,7 +101,7 @@ flowchart LR
 
   OMS -->|pre-trade| RISK
   RISK --> MOD
-  MOD --> SPAN
+  MOD -->|"NFO only"| SPAN
   RISK --> PORT
   OMS -->|NewOrder proto| ME
   ME -->|Trade, OrderUpdate| BUS

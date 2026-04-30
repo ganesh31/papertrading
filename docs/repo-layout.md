@@ -26,6 +26,9 @@ papertrading/
     contracts/                    # Zod schemas + TS types
     bus/                          # Redis Streams wrapper (TS); Go equiv in services/go/bus
     config/                       # Shared env-loading, logging, tracing helpers
+    modules/                      # Asset-class modules (Equity first, NFO later)
+      equity/                     # OrderSemantics + RiskModel + PositionModel + SettlementModel
+      nfo/                        # Futures/Options/SPAN integration behind same contracts
   infra/
     docker-compose.yml
     grafana/ prometheus/ loki/ tempo/   # dashboards, rules, configs
@@ -113,6 +116,12 @@ packages/protos/
 - No cross-service imports. Ever.
 - Services import from `packages/*` only.
 - `packages/*` never import from `services/*` or `apps/*`.
+
+### Asset modules (plug-in boundary)
+
+- Domain variability (Equity vs NFO) lives in `packages/modules/*` behind stable contracts.
+- Core services (`services/oms`, `services/risk`, `services/portfolio`, `services/reports`) depend on module interfaces and dispatch by `InstrumentSpec.assetClass` / `InstrumentSpec.segment`.
+- Specialized engines (e.g. `services/go/span`) remain services; the NFO module calls them via client stubs.
 
 ### Config
 

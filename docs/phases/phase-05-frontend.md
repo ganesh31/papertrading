@@ -86,7 +86,7 @@ flowchart LR
   - Price (must align to tick_size).
   - Trigger (if SL/SL-M).
   - Product / Validity / Order Type toggles.
-- **Margin preview**: calls `POST /risk/preview` with the draft order, shows required margin.
+- **Margin preview**: calls `POST /risk/preview` with the draft order; the backend delegates to the relevant asset module RiskModel (Equity now, NFO later) and returns required margin + breakdown.
 - **Charges preview**: calls `POST /charges/preview` for STT/brokerage/GST breakdown.
 - Submit → `POST /orders` with Idempotency-Key = ULID. Button disabled until response.
 - Optimistic "ORDER_ACCEPTED" toast; updates when OMS push confirms OPEN/PARTIAL/FILLED/REJECTED.

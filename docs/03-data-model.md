@@ -24,16 +24,20 @@ v1 seeded with a single row.
 
 Re-ingested daily from Angel's `OpenAPIScripMaster.json` and NSE's F&O contract file.
 
+This table is the source for the canonical `InstrumentSpec` used by the asset-module boundary (see [02-architecture.md](./02-architecture.md)). Core services route by `instrument_id` and never re-derive contract terms by parsing `tradingsymbol`.
+
 ```sql
 create table ref.instruments (
   instrument_id   text primary key,                 -- ULID
   tradingsymbol   text not null,                    -- e.g. "NIFTY24DEC25000CE"
-  exchange        text not null,                    -- NSE | BSE | NFO | BFO
-  segment         text not null,                    -- EQ | FUT | OPT | INDEX
-  instrument_type text,                             -- CE | PE | FUT | EQ
-  underlying      text,                             -- NIFTY, INFY...
+  exchange        text not null,                    -- NSE | BSE
+  segment         text not null,                    -- NSE_EQ | NFO
+  asset_class     text not null,                    -- EQUITY | DERIVATIVES
+  instrument_type text not null,                    -- EQ | FUT | OPT
+  underlying_instrument_id text,                    -- instrument_id of underlying (for derivatives)
   expiry          date,
   strike          numeric(18,4),
+  option_type     text,                             -- CE | PE (options only)
   lot_size        integer not null default 1,
   tick_size       numeric(18,4) not null default 0.05,
   freeze_qty      integer,
@@ -43,8 +47,8 @@ create table ref.instruments (
   metadata        jsonb default '{}'::jsonb,
   created_at      timestamptz default now()
 );
-create unique index on ref.instruments (exchange, tradingsymbol);
-create index on ref.instruments (underlying, expiry);
+ create unique index on ref.instruments (exchange, segment, tradingsymbol);
+ create index on ref.instruments (underlying_instrument_id, expiry);
 ```
 
 ## `oms` — orders (event-sourced)

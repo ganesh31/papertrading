@@ -35,9 +35,9 @@ The plan is **Equity-first**, with additional asset classes (starting with **NSE
 - [phases/phase-03-oms-risk.md](./phases/phase-03-oms-risk.md) — Week 5 — event-sourced OMS, pre-trade risk, reject taxonomy, drop-copy.
 - [phases/phase-04-positions-pnl.md](./phases/phase-04-positions-pnl.md) — Week 6 — positions, P&L, ledger, MIS/CNC/NRML, position conversion.
 - [phases/phase-05-frontend.md](./phases/phase-05-frontend.md) — Weeks 7–8 — Kite-clone UI, TradingView charts, order pad.
-- [phases/phase-06-futures.md](./phases/phase-06-futures.md) — Week 9 — futures contracts, daily MTM, expiry, rollover.
-- [phases/phase-07-options.md](./phases/phase-07-options.md) — Weeks 10–11 — option chain, greeks, IV solver, expiry settlement.
-- [phases/phase-08-span-margin.md](./phases/phase-08-span-margin.md) — Weeks 12–13 — SPAN scenario engine, spread charges, exposure margin.
+- [phases/phase-06-futures.md](./phases/phase-06-futures.md) — Week 9 — **NSE F&O module**: futures contracts, daily MTM, expiry, rollover.
+- [phases/phase-07-options.md](./phases/phase-07-options.md) — Weeks 10–11 — **NSE F&O module**: option chain, greeks, IV solver, expiry settlement.
+- [phases/phase-08-span-margin.md](./phases/phase-08-span-margin.md) — Weeks 12–13 — **NSE F&O module**: SPAN scenario engine, spread charges, exposure margin.
 - [phases/phase-09-strategy-sdk.md](./phases/phase-09-strategy-sdk.md) — Week 14 — strategy runtime, deterministic backtest/live parity.
 - [phases/phase-10-clearing-settlement.md](./phases/phase-10-clearing-settlement.md) — Week 15 — EOD scheduler, T+1, corporate actions, contract notes.
 - [phases/phase-11-hardening.md](./phases/phase-11-hardening.md) — Week 16+ — load/chaos, kill switch, deploy, demo.
