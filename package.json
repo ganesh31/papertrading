@@ -2,6 +2,7 @@
   "name": "papertrading",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Equity-first paper trading system with plug-in asset modules.",
   "scripts": {
     "prepare": "lefthook install",
@@ -9,15 +10,37 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "check": "turbo run lint test build"
+    "check": "turbo run lint test build",
+    "cz": "cz"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.33.2",
+  "config": {
+    "commitizen": {
+      "path": "cz-emoji"
+    },
+    "cz-emoji": {
+      "conventional": true,
+      "scopes": [
+        "web",
+        "api-gateway",
+        "auth-svc",
+        "worker-svc",
+        "ui",
+        "config",
+        "deps",
+        "ci",
+        "docs"
+      ]
+    }
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
+    "commitizen": "^4.3.1",
+    "cz-emoji": "1.3.2-canary.2",
     "lefthook": "^2.1.6",
     "turbo": "^2.9.6"
   }

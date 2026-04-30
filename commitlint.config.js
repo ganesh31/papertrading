@@ -17,6 +17,7 @@ export default {
         "config",
         "deps",
         "ci",
+        "docs",
       ],
     ],
   },

@@ -6,15 +6,15 @@ Goal: a one-command dev environment, CI green on an empty app, observability wir
 
 ## Prerequisites
 
-- macOS / Linux with Docker, pnpm 9, Node 20, Go 1.22.
-- Accounts: GitHub (for Actions + GHCR), Angel One (API access enabled), free-tier Grafana Cloud optional (not used in v1).
+- macOS / Linux with Docker, **pnpm 10** (repo pins via Corepack — see root `package.json` `packageManager`), **Node 20**, **Go 1.25.x**.
+- Accounts: GitHub (for Actions; GHCR image push is planned later unless you add it — optional), Angel One (API access enabled), free-tier Grafana Cloud optional (not used in v1).
 
 ## Deliverables (Definition of Done)
 
 - Monorepo scaffolded with pnpm workspaces + Turborepo + Go workspaces.
-- `docker-compose up` brings up Postgres+Timescale, Redis, Grafana, Prometheus, Loki, Tempo — all healthy.
+- **`make up`** (Compose from `infra/docker-compose.yml`) brings up Postgres+Timescale, Redis, Grafana, Prometheus, Loki, Tempo, **`gateway`**, **`md`** — all healthy.
 - One Node service (`gateway`) and one Go service (`md`) stand up with `/healthz`, emit OTel traces visible in Tempo and a metric visible in Prometheus.
-- `pnpm turbo run lint test build` is green locally and in CI.
+- **`pnpm check`** (Turbo lint / test / build) is green locally and in CI.
 - `.env.example` + secrets hygiene in place.
 - ADR-0001 (monorepo boundaries), ADR-0003 (single-tenant v1), ADR-0004 (Go for hot path) written.
 - Talking-points doc for Phase 0 written.
@@ -27,7 +27,7 @@ Goal: a one-command dev environment, CI green on an empty app, observability wir
 - `go work init`, create `services/go/md`, `services/go/matching` as skeletons.
 - `.editorconfig`, `.gitignore`, `.env.example`, `LICENSE` (MIT).
 - `README.md` (top-level) linking to `docs/`.
-- Commit hygiene: `commitlint` + `husky` or `lefthook`.
+- Commit hygiene: `commitlint` + **`lefthook`** (repo default).
 
 ### 0.2 Docker compose
 
@@ -46,30 +46,31 @@ Goal: a one-command dev environment, CI green on an empty app, observability wir
 - Initial migrations:
   - `001_create_schemas.sql` (`oms`, `portfolio`, `md`, `reports`, `ref`).
   - `002_ref_users.sql` + seed the single user.
-- `just migrate` wired.
+- **`make migrate`** / **`just migrate`** wired (`infra/bin/dbmate.sh`).
 
 ### 0.4 Skeleton services
 
 - `services/gateway`: Fastify, `/healthz`, `/metrics` (Prometheus), OTel instrumentation via `@opentelemetry/auto-instrumentations-node`.
-- `services/go/md`: Gin/Echo (or stdlib), `/healthz`, `/metrics`, OTel via `go.opentelemetry.io/otel`.
+- `services/go/md`: **`net/http`** (stdlib), `/healthz`, `/metrics`, OTel via `go.opentelemetry.io/otel`.
 - Both emit one business metric: `hello_requests_total`.
 
 ### 0.5 CI
 
 - `.github/workflows/ci.yml`:
   - `setup-node`, `setup-go`, `pnpm install --frozen-lockfile`.
-  - `turbo run lint test build`.
-  - `go test ./...`.
-  - Build container images on `main` merges; push to GHCR.
-- Required status check on PRs.
+  - `pnpm check` (runs Turbo **lint / test / build** via repo scripts).
+  - Go tests **per module** (multi-module workspace — root `go test ./...` is not meaningful): `(cd services/go/md && go test ./...)`, `(cd services/go/matching && go test ./...)`.
+  - Optional (resume/portfolio polish): build/push container images on `main` merges to GHCR — **not wired by default**; add when you want publish loops.
+
+Configure branch protection on GitHub so **`ci`** is a required status check on PRs.
 
 ### 0.6 Observability verification
 
-- Spin everything up, hit `/healthz` on both services 100 times.
-- Grafana dashboard `Trading Overview` shows the metric.
-- Tempo shows a trace with a span from each service.
-- Loki shows JSON logs.
-- Screenshot into `docs/phases/phase-00-foundation.md` (optional).
+- Spin everything up (`make up`), hit `/healthz` on both services **100 times**.
+- **Prometheus** scrape targets for `gateway` + `md` are **up** (`http://localhost:9090/api/v1/targets` — jobs scrape `/metrics`; counters include `hello_requests_total`).
+- Grafana Explore → **Loki**: `{container=~".*gateway.*"}` returns logs once gateway runs **as a Docker service** (see root `README.md`).
+- Grafana Explore → **Tempo**: after `/healthz` hits, traces appear for `gateway` + `md` (service names from `OTEL_SERVICE_NAME`).
+- Optional polish: provision a Grafana dashboard JSON named **Trading Overview** for `hello_requests_total`; screenshot into this doc.
 
 ### 0.7 ADRs written
 
@@ -126,6 +127,7 @@ Goal: a one-command dev environment, CI green on an empty app, observability wir
 ## Exit checklist before starting Phase 1
 
 - Everything in "Deliverables" above is checked.
-- You can show a stranger `just up` and it works.
-- You've written 2 ADRs and committed them.
-- You've taken a screenshot of Grafana and pinned it somewhere.
+- You can show a stranger **`make up`** (and **`make migrate`**) — **`just`** recipes delegate to `make`, same commands.
+- ADRs **0001**, **0003**, **0004** merged under `docs/adrs/`.
+- Talking-points **`docs/talking-points/phase-00.md`** exists (indexed from `talking-points/README.md`).
+- Optional: Grafana screenshot pinned somewhere / embedded above.
