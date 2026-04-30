@@ -7,17 +7,45 @@
 | ----------------- | ---- | ---------------------------------------------- | ------------- |
 | `gateway`         | TS   | Auth stub, WS fan-out, FE↔BE routing           | REST, WS      |
 | `oms`             | TS   | Order lifecycle, event log, idempotency        | REST, Bus     |
-| `risk`            | TS   | Pre-trade checks, limits, orchestrates SPAN    | REST, Bus     |
-| `portfolio`       | TS   | Positions & holdings projection, P&L, ledger   | REST, Bus     |
+| `risk`            | TS   | Pre-trade checks, limits, margin orchestration | REST, Bus     |
+| `portfolio`       | TS   | Positions & holdings projection, P&L, ledger (asset-agnostic core) | REST, Bus |
 | `reports`         | TS   | Contract notes, P&L reports, margin statements | REST          |
 | `strategy-runner` | TS   | Hosts strategy processes                       | Internal      |
 | `go/matching`     | Go   | CLOB per symbol, matching, book snapshots      | gRPC, Bus     |
 | `go/md`           | Go   | Broker adapter, tick normalization, candles    | gRPC, WS, Bus |
-| `go/span`         | Go   | Scenario-based margin calc                     | gRPC          |
+| `go/span`         | Go   | Scenario-based margin calc (NFO module)        | gRPC          |
 | `go/mm`           | Go   | Synthetic market-maker quoting                 | Bus           |
 
 
 **Rule of thumb**: if it's on the order path and must be fast, it's Go. If it's stateful business logic that changes often, it's TS.
+
+## Asset-class plug-in boundary (Equity-first)
+
+Core services are intentionally **asset-agnostic**. Anything that varies by asset class (cash equity vs. derivatives) is implemented behind a small set of **asset modules**. v1 ships the **Equity module** first; NSE F&O is added later as a second module.
+
+### Canonical instrument model
+
+Every request and event ultimately references an `instrument_id` which resolves (via the instrument master) to an `InstrumentSpec` containing:
+
+- `assetClass`: `EQUITY` | `DERIVATIVES`
+- `segment`: `NSE_EQ` | `NFO`
+- `instrumentType`: `EQ` | `FUT` | `OPT`
+- `tradingConstraints`: `tickSize`, `lotSize`, `freezeQty`, price bands, product availability (CNC/MIS/NRML)
+- `contract`: optional derivative metadata (`expiry`, `strike`, `optionType`, `underlyingInstrumentId`, `lotSize`)
+
+### Asset module contracts (owned by domain, called by core)
+
+The core services depend on these contracts; the module implementation depends on reference data and (optionally) specialized engines like SPAN:
+
+- **OrderSemantics**: validate order request given `InstrumentSpec` and market session state.
+  Example differences: CNC short-sell rules, derivatives product types, expiry cutoffs.
+- **RiskModel**: pre-trade margin check + **margin block/release** semantics.
+  Equity: VAR+ELM (or conservative default). NFO: SPAN+Exposure via `go/span`.
+- **PositionModel**: how trades aggregate into positions/holdings, MTM and expiry handling.
+  Equity: T+1 holdings + intraday positions. NFO: daily MTM + expiry settlement.
+- **SettlementModel**: end-of-day jobs and corporate actions hooks.
+
+Implementation shape (language-agnostic): core services call `AssetModules` by `assetClass`/`segment`; module logic returns deterministic results and structured reject codes/events.
 
 ## High-level diagram
 
@@ -38,6 +66,7 @@ flowchart LR
     PORT[Portfolio &<br/>Positions]
     RPT[Reports]
     STRAT[Strategy Runtime]
+    MOD[AssetModules<br/>Equity,NFO]
   end
 
   subgraph CoreGo["Hot path Go"]
@@ -66,7 +95,8 @@ flowchart LR
   GW <-->|market data WS| MD
 
   OMS -->|pre-trade| RISK
-  RISK --> SPAN
+  RISK --> MOD
+  MOD --> SPAN
   RISK --> PORT
   OMS -->|NewOrder proto| ME
   ME -->|Trade, OrderUpdate| BUS
@@ -102,6 +132,7 @@ sequenceDiagram
   participant GW as Gateway
   participant OMS as OMS
   participant RISK as Risk
+  participant MOD as AssetModule (Equity/NFO)
   participant SPAN as SPAN (Go)
   participant ME as Matching Engine (Go)
   participant BUS as Event Bus
@@ -111,8 +142,12 @@ sequenceDiagram
   GW->>OMS: PlaceOrder(req)
   OMS->>OMS: persist OrderEvent{NEW}
   OMS->>RISK: check(order, portfolio)
-  RISK->>SPAN: incrementalMargin(portfolio ∪ order)
-  SPAN-->>RISK: {span, exposure, total}
+  RISK->>MOD: riskCheck(order, portfolioSnapshot, instrumentSpec)
+  alt derivatives (NFO)
+    MOD->>SPAN: incrementalMargin(portfolio ∪ order)
+    SPAN-->>MOD: {span, exposure, total}
+  end
+  MOD-->>RISK: OK | REJECTED{reason, marginBlockedDelta}
   RISK-->>OMS: OK | REJECTED{reason}
   alt rejected
     OMS->>OMS: persist OrderEvent{REJECTED}

@@ -2,6 +2,8 @@
 
 One consolidated list. Starred items are high-leverage for your goal.
 
+For **URLs organised by NotebookLM notebook** (Markets, Delivery, Architecture, optional theory), see **[notebooklm-resource-urls.md](./notebooklm-resource-urls.md)**.
+
 ## Books
 
 - ⭐ **Larry Harris — *Trading and Exchanges: Market Microstructure for Practitioners*.** The one book. Chapters 4, 5, 11 in particular.

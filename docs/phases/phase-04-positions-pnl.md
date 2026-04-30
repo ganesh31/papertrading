@@ -1,8 +1,10 @@
-# Phase 4 — Positions, P&L, Ledger
+# Phase 4 — Portfolio core (Positions, P&L, Ledger) + Equity module
 
 **Week 6 · ~20 hrs**
 
 Goal: live positions, holdings (T+1 transition), realised & unrealised P&L, and a double-entry ledger. This is where the system "feels real" — you see your paper money move.
+
+This phase builds an **asset-agnostic portfolio core** (projector + ledger invariants) plus the **Equity module rules** for holdings/T+1 and equity-specific constraints. NFO adds its own MTM/expiry logic later by implementing the same module hooks.
 
 ## Prerequisites
 
@@ -12,7 +14,7 @@ Goal: live positions, holdings (T+1 transition), realised & unrealised P&L, and 
 ## Deliverables
 
 - [ ] `services/portfolio` projects `portfolio.positions` from `oms.trades` in real time.
-- [ ] Product types modelled: MIS, CNC, NRML.
+- [ ] Product types modelled: MIS, CNC, NRML (module may restrict which are valid per segment).
 - [ ] Position conversion API: `POST /positions/:id/convert { to: "CNC"|"NRML" }`.
 - [ ] Unrealised P&L computed on each LTP tick (in-memory reducer, streamed to FE via gateway).
 - [ ] Realised P&L on every fill (FIFO lot-level).
@@ -51,7 +53,7 @@ Keyed `(user_id, instrument_id, product)`:
 - On BUY trade: `net_qty += qty`. Update `avg_price` via weighted average for adds (qty × price); for partial close or flip, see below.
 - On SELL trade with net_qty > 0 (closing long): realise P&L on the reduced portion; leave `avg_price` unchanged for remainder.
 - If sell exceeds long qty → remainder becomes short with new `avg_price`.
-- Symmetric for shorts (only applicable to F&O; equity MIS allows short intraday only).
+- Symmetric for shorts (equity MIS may allow short intraday depending on your chosen constraints; NFO module supports shorts as a first-class case).
 
 Implementation: replay safe (idempotent by `trade_id` — record last processed trade per position).
 
@@ -69,7 +71,7 @@ Implementation: replay safe (idempotent by `trade_id` — record last processed 
 ### Position conversion
 
 - MIS → CNC: requires full cash; risk re-check; if OK, move qty from MIS row to CNC row at same avg_price; ledger entry moves margin from MARGIN_BLOCKED to CASH-reserved.
-- MIS → NRML (for F&O, after Phase 6): SPAN re-check.
+- MIS → NRML (NFO module, after Phase 6): margin re-check (placeholder initially; SPAN in Phase 8).
 - CNC → MIS: allowed intraday only; releases cash into MARGIN_BLOCKED.
 
 ## Ledger (double-entry)
@@ -118,7 +120,7 @@ Invariant: `Σ debits == Σ credits` per user per day (asserted by test).
 
 ### 4.5 Intraday square-off (MIS)
 
-- At 15:15 IST (for equity), 15:25 (for F&O):
+- At 15:15 IST (for equity), 15:25 (for NFO):
   - For each MIS position with net_qty != 0: place MARKET order to flatten.
   - Tag order `system=true, reason=MIS_AUTO_SQUAREOFF`.
 - Actual scheduler wiring in Phase 10; v1 can be a CLI: `pt admin squareoff --user=<id>`.

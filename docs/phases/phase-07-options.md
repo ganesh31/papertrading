@@ -1,8 +1,8 @@
-# Phase 7 — Equity & Index Options
+# Phase 7 — NSE F&O module: Options
 
 **Weeks 10–11 · ~40 hrs**
 
-Goal: full options lifecycle. Option chain with live greeks and IV, premium trading, expiry settlement with STT-on-exercise handled correctly, multi-leg composition on the FE (margin benefit comes in Phase 8).
+Goal: add the **NSE F&O asset module** for options: full options lifecycle. Option chain with live greeks and IV, premium trading, expiry settlement with STT-on-exercise handled correctly, multi-leg composition on the FE (margin benefit comes in Phase 8).
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Goal: full options lifecycle. Option chain with live greeks and IV, premium trad
   - ITM: intrinsic value paid/received; STT on exercise applied (⚠ the famous trap).
   - OTM: premium loss (for buyer), premium profit (for seller).
 - [ ] Multi-leg order composition UI (e.g., Bull Call Spread): places N orders as a group; all-or-none semantics at FE level (server-side atomicity is a v2 notion; document the gap).
-- [ ] Interim option margin: `premium × lot_size` for buyer; `initial_margin%` for seller. Phase 8 replaces seller margin with SPAN.
+- [ ] Interim option margin (NFO RiskModel): `premium × lot_size` for buyer; `initial_margin%` for seller. Phase 8 replaces seller margin with SPAN+Exposure.
 - [ ] ADR-0012 (greeks computation server vs. client).
 - [ ] Talking-points doc.
 

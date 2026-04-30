@@ -1,8 +1,8 @@
-# Phase 6 — Equity Futures
+# Phase 6 — NSE F&O module: Futures
 
 **Week 9 · ~20 hrs**
 
-Goal: trade index and stock futures end-to-end. Daily MTM, expiry settlement, rollover helper. Interim margin stays on the placeholder VAR model until Phase 8 replaces it with SPAN.
+Goal: add the **NSE F&O asset module** for futures: trade index and stock futures end-to-end. Daily MTM, expiry settlement, rollover helper. Interim margin can start as a placeholder model; Phase 8 replaces it with SPAN+Exposure behind the module boundary.
 
 ## Prerequisites
 
@@ -12,14 +12,14 @@ Goal: trade index and stock futures end-to-end. Daily MTM, expiry settlement, ro
 ## Deliverables
 
 - [ ] Contract master loads NIFTY, BANKNIFTY, FINNIFTY + stock futures for current + next month + current quarter.
-- [ ] Matching, OMS, positions all work for `segment='FUT'`.
+- [ ] Matching, OMS, portfolio all work for `segment='NFO'` + `instrumentType='FUT'` via the NFO module.
 - [ ] Daily MTM job: settles P&L at the daily settlement price.
 - [ ] Expiry settlement:
   - Index futures: cash-settled at final settlement price (index close on expiry day).
   - Stock futures: cash-settled at final settlement price.
 - [ ] Rollover helper: "Rollover to next expiry" action closes current + opens next at ask.
 - [ ] Product `NRML` (carry-forward) + `MIS` (intraday) both supported.
-- [ ] Margin: placeholder `initial_margin% × contract_value` (configurable per underlying; e.g., 15% NIFTY, 20% stock); Phase 8 replaces with SPAN.
+- [ ] Margin (NFO RiskModel): placeholder `initial_margin% × contract_value` (configurable per underlying; e.g., 15% NIFTY, 20% stock). Phase 8 swaps in SPAN+Exposure.
 - [ ] Option chain widget still works; futures chain shown as a simple row per expiry.
 - [ ] ADR-0011 (MTM-as-ledger-entry vs. settlement-as-trade).
 - [ ] Talking-points doc.

@@ -6,11 +6,22 @@ Build a paper-trading system that is **structurally indistinguishable from a rea
 
 - Own Central Limit Order Book (CLOB) matching engine with price-time priority.
 - Event-sourced Order Management System (OMS).
-- Pre-trade risk with SPAN + Exposure for F&O and VAR + ELM for cash.
+- Pre-trade risk with VAR + ELM for equity cash, and SPAN + Exposure for derivatives.
 - Daily MTM, T+1 settlement, corporate actions.
 - Kite-clone UI + programmatic strategy SDK with live/backtest parity.
 
 Use Angel One SmartAPI + NSE historical data behind an adapter. **No order is ever sent to a real exchange**; every order is matched in-house against synthetic market-maker liquidity seeded from real prices.
+
+## Core principle: equity-first, asset-class plug-ins
+
+Build a complete **Equity cash** broker slice first (orders → fills → positions/holdings → P&L → ledger → UI). Everything beyond equity is implemented as an **asset-class module plug-in** (first: NSE F&O) without refactoring core services.
+
+Terminology used throughout the docs:
+
+- **Asset class**: top-level product family. v1 starts with `EQUITY` and later adds `DERIVATIVES` as a plug-in (NSE F&O).
+- **Segment**: exchange segment / market. Examples: `NSE_EQ`, `NFO`.
+- **Instrument type**: contract kind. Examples: `EQ`, `FUT`, `OPT`.
+- **Instrument**: a concrete tradable contract identified by an `instrument_id` (e.g. `INFY` equity, `NIFTY24MAYFUT`, `NIFTY24MAY24500CE`).
 
 ## Why this project
 
@@ -23,10 +34,12 @@ Two goals, both served by the same build:
 
 Must-have:
 
-- Equity cash, equity futures, index options, stock options supported end-to-end.
+- **Equity cash works end-to-end**: place/cancel/modify, fills, positions + holdings (T+1), realised & unrealised P&L, double-entry ledger, and the UI can trade it.
+- **Asset-class plug-in architecture is real**: NSE F&O is added as a module (not a refactor), and futures + options trade end-to-end with correct lifecycle semantics.
 - LIMIT, MARKET, SL, SL-M, IOC, FOK order types match correctly (golden-file tests pass).
-- Pre-trade SPAN + Exposure margin check blocks over-leveraged orders; rejection reasons mirror Kite/Angel codes.
-- Intraday positions, holdings (T+1), realised & unrealised P&L, double-entry ledger.
+- Pre-trade margin blocks over-leveraged orders:
+  - Equity cash: VAR + ELM (with sensible defaults if a daily file is missing).
+  - NSE F&O: SPAN + Exposure.
 - Kite-clone UI: watchlist, L5 depth, TradingView chart, order pad, option chain, positions, holdings, funds.
 - Strategy SDK with one sample strategy runnable in **both live and replay** modes, deterministic in replay.
 - Observability: p50/p95/p99 order-ack latency histogram, OTR, reject-reason counters, event loop lag, GC pause — visible on Grafana.
@@ -71,14 +84,14 @@ Budget: ~3 hours/day, target ~14–16 weeks. Phases overlap slightly; one demoab
 | 1     | 0 — Foundation      | `docker-compose up` → Grafana + Postgres + Redis + Timescale green      |
 | 2     | 1 — Market Data     | `nse_replay` default adapter; seeded data replays at 100× speed¹        |
 | 3–4   | 2 — Matching Engine | 5 symbols tradeable against synthetic MMs; golden-file tests pass       |
-| 5     | 3 — OMS + Risk      | Orders event-sourced, rejections look like Kite's                       |
-| 6     | 4 — Positions/P&L   | Live positions, holdings after T+1 job, ledger balances                 |
-| 7–8   | 5 — Frontend v1     | You can place orders from the UI                                        |
-| 9     | 6 — Futures         | NIFTY & BANKNIFTY futures traded with daily MTM                         |
-| 10–11 | 7 — Options         | Option chain with live greeks; expiry settles correctly                 |
-| 12–13 | 8 — SPAN            | Pre-trade SPAN scenarios match NSE's daily margin file within tolerance |
+| 5     | 3 — OMS + Risk      | OMS is event-sourced; Equity module validates + risk-checks cash orders |
+| 6     | 4 — Positions/P&L   | Equity positions/holdings/P&L/ledger are correct end-to-end             |
+| 7–8   | 5 — Frontend v1     | **Equity broker slice demoable**: trade from UI, see fills + P&L        |
+| 9     | 6 — Futures (plug-in) | NFO futures module: contracts + daily MTM + expiry                      |
+| 10–11 | 7 — Options (plug-in) | NFO options module: chain + greeks + expiry settlement                  |
+| 12–13 | 8 — SPAN (plug-in)  | NFO risk module: SPAN + Exposure matches NSE daily files within tolerance |
 | 14    | 9 — Strategy SDK    | SMA crossover runs in live and replay, same outcomes                    |
-| 15    | 10 — Settlement     | EOD jobs, contract note PDF, corporate actions                          |
+| 15    | 10 — Settlement     | EOD jobs, T+1, contract notes; extended for NFO lifecycle               |
 | 16+   | 11 — Hardening      | Load + chaos tests, deployment, demo                                    |
 
 ¹ **Replay-first**: all of Phases 1–10 run on historical data via the `nse_replay` adapter — deterministic, offline, and fast-forwardable. The `angel_live` adapter is stubbed in Phase 1 but only wired up in Phase 11 when you have a VPS with a static IP. See [phases/phase-01-market-data.md](./phases/phase-01-market-data.md#core-principle-replay-first) for data sources and setup.

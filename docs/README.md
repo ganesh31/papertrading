@@ -1,6 +1,8 @@
 # Paper Trading System — Documentation
 
-A learning-first build of an NSE/BSE-style paper trading platform: CLOB matching engine, event-sourced OMS, SPAN margin, F&O lifecycle, Kite-clone UI. Goal: deep Senior-Architect-level understanding of how Indian brokers actually work, plus a portfolio artifact that's demoable end-to-end.
+A learning-first build of an NSE/BSE-style paper trading platform: CLOB matching engine, event-sourced OMS, broker-grade risk + portfolio/ledger, Kite-clone UI.
+
+The plan is **Equity-first**, with additional asset classes (starting with **NSE F&O**) implemented as **plug-in asset modules** rather than refactors of OMS/portfolio core.
 
 ## How to read these docs
 
@@ -22,6 +24,8 @@ A learning-first build of an NSE/BSE-style paper trading platform: CLOB matching
 - [05-nse-domain-primer.md](./05-nse-domain-primer.md) — NSE/BSE sessions, order types, circuit filters, freeze qty, T+1, peak margin, MWPL.
 - [resources.md](./resources.md) — curated books, papers, OSS, official NSE/SEBI links.
 - [repo-layout.md](./repo-layout.md) — monorepo structure, package conventions.
+- [notebooklm-study-structure.md](./notebooklm-study-structure.md) — NotebookLM notebooks, sources, prompts, weekly workflow.
+- [notebooklm-resource-urls.md](./notebooklm-resource-urls.md) — **External URLs by NotebookLM notebook** (Markets / Delivery / Architecture / External theory) + paste/download tips.
 
 ### Phases
 

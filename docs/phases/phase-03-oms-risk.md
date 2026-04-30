@@ -1,8 +1,10 @@
-# Phase 3 — OMS + Pre-trade Risk (Equity Cash)
+# Phase 3 — OMS + Pre-trade Risk (Equity module)
 
 **Week 5 · ~20 hrs**
 
-Goal: a real broker-grade OMS — event-sourced, idempotent, with state-machine guarantees — plus a pre-trade risk orchestrator that blocks over-leveraged orders. In v1, risk uses simple cash + VAR+ELM; SPAN comes in Phase 8.
+Goal: a real broker-grade OMS — event-sourced, idempotent, with state-machine guarantees — plus a pre-trade risk orchestrator that blocks over-leveraged orders.
+
+Equity cash is the **first asset module**: validation + risk checks are implemented for `assetClass=EQUITY` / `segment=NSE_EQ`. NSE F&O is added later as a separate module (Phase 6–8) without changing OMS fundamentals.
 
 ## Prerequisites
 
@@ -15,7 +17,7 @@ Goal: a real broker-grade OMS — event-sourced, idempotent, with state-machine 
 - Full order state machine enforced; illegal transitions rejected.
 - `oms.order_events` append-only log = source of truth.
 - Idempotency via `Idempotency-Key` header (Redis + DB).
-- Pre-trade risk checks via `services/risk`; rejections carry structured reason codes.
+- Pre-trade risk checks via `services/risk` which **delegates to the asset module** (Equity now; NFO later); rejections carry structured reason codes.
 - Reject-reason taxonomy documented in `docs/reject-reasons.md`.
 - Drop-copy stream (`oms.drop_copy.v1`) emits every order + trade event for surveillance consumers.
 - Rate limiting per user (50 orders/min).
@@ -121,12 +123,12 @@ Note: client gets 200 on *accepted into ME*, not *filled*. Fill is a push event.
 ### 3.3 Risk orchestrator
 
 - `services/risk` exposes `POST /check` with `{ userId, orderReq }`.
-- v1 equity cash rules:
+- v1 equity cash rules (Equity module):
   - For BUY CNC: require cash ≥ (qty × price) + est. charges.
   - For BUY MIS intraday: require `VAR% × notional` (VAR from NSE's daily file, default 20% if missing).
   - For SELL CNC: require holdings ≥ qty (no short delivery).
   - For SELL MIS: same intraday margin as BUY.
-- For v1 F&O (interim, pre-Phase-8): use flat `20% × notional` placeholder; ADR explicitly notes SPAN will replace this.
+- For NFO (later module): Phase 6 may start with a placeholder margin rule, but the interface is the same and Phase 8 swaps in SPAN+Exposure behind the module boundary.
 - Calls portfolio service for current cash/holdings; caches user snapshot in Redis with 100 ms TTL.
 - Returns structured result with `marginBlocked` so OMS can post it.
 

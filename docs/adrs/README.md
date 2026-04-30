@@ -58,6 +58,9 @@ Links to prior art, external docs, related ADRs.
 | 0017 | Corporate action application model (planned)            | Proposed | 10    |
 | 0018 | What I'd do differently at scale (retrospective)        | Proposed | 11    |
 | 0019 | Tick synthesis from 1-minute bars (planned)             | Proposed | 1     |
+| 0020 | Asset-class module boundary                             | Accepted | 0     |
+| 0021 | Canonical instrument spec + contract metadata           | Accepted | 1     |
+| 0022 | Risk model interface (VAR+ELM vs SPAN)                  | Accepted | 3     |
 
 
 ## When to write an ADR

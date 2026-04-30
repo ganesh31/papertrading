@@ -4,6 +4,8 @@
 
 Goal: the "EOD machine". Every operation a real broker runs between 15:30 and 00:00, implemented as scheduled jobs: MIS square-off, daily MTM, T+1 holdings transition, contract notes, corporate actions, day open reset.
 
+Design note: the scheduler is **asset-agnostic**; asset modules contribute job logic (e.g., NFO MTM + expiry settlement; Equity T+1 holdings + corporate actions adjustments) behind a stable interface.
+
 ## Prerequisites
 
 - Phases 0–9 complete (SPAN ideal, not mandatory).
@@ -12,7 +14,7 @@ Goal: the "EOD machine". Every operation a real broker runs between 15:30 and 00
 
 - [ ] Scheduler service (Temporal or simple cron runner) executing named jobs in dependency order.
 - [ ] Trading calendar (holidays, weekends) drives job schedule.
-- [ ] Jobs: `intraday_squareoff`, `close_session`, `daily_mtm`, `holdings_rollover_t1`, `contract_notes`, `corp_actions_apply`, `rotate_kill_switch`, `backup_event_log`, `day_open_reset`.
+- [ ] Jobs: `intraday_squareoff`, `close_session`, `daily_mtm` (NFO), `holdings_rollover_t1` (Equity), `contract_notes`, `corp_actions_apply`, `rotate_kill_switch`, `backup_event_log`, `day_open_reset`.
 - [ ] Contract note PDFs generated per user per day (Puppeteer + HTML template).
 - [ ] Corporate actions ingested from NSE corporate actions file; applied on ex-date.
 - [ ] Day-open reset: clears intraday caches, rotates circuit flags, refreshes contract master.

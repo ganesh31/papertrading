@@ -18,7 +18,7 @@
 - [ ] Spread charges: intra-commodity (calendar) + inter-commodity.
 - [ ] Short Option Minimum (SOM).
 - [ ] Exposure margin layered on top.
-- [ ] Risk orchestrator calls SPAN for every F&O order pre-trade (incremental).
+- [ ] NFO asset module RiskModel uses SPAN+Exposure for every NFO order pre-trade (incremental), without changing OMS/portfolio core.
 - [ ] Margin statement report: per-user, per-underlying breakdown.
 - [ ] Validation: reconcile your SPAN output against NSE's published margin files for known portfolios, within 1–2% tolerance (SPAN has minor version drift).
 - [ ] ADRs: `0013-span-scenarios`, `0014-span-vs-var-for-equity`.
