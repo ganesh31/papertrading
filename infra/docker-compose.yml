@@ -21,6 +21,7 @@ services:
       dockerfile: services/go/md/Dockerfile
     environment:
       MD_PORT: 6011
+      MD_ADAPTER: ${MD_ADAPTER:-nse_replay}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_SERVICE_NAME: md
     ports:

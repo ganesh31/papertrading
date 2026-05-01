@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -65,6 +68,26 @@ func main() {
 	shutdownTracer := initTracer(ctx)
 	defer func() { _ = shutdownTracer(context.Background()) }()
 
+	broker, err := adapter.NewFromEnv()
+	if err != nil {
+		log.Fatalf("broker adapter: %v", err)
+	}
+	log.Printf("md broker adapter: %s", broker.Kind())
+
+	adapterCtx, stopAdapter := context.WithCancel(ctx)
+	defer stopAdapter()
+	go func() {
+		err := broker.Run(adapterCtx, nil)
+		switch {
+		case err == nil:
+		case errors.Is(err, context.Canceled):
+		case errors.Is(err, adapter.ErrNotConfigured):
+			log.Printf("broker adapter: %v", err)
+		default:
+			log.Printf("broker adapter stopped: %v", err)
+		}
+	}()
+
 	port := 6011
 	if v := os.Getenv("MD_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil {
@@ -78,12 +101,17 @@ func main() {
 	})
 	prometheus.MustRegister(helloCounter)
 
+	kind := string(broker.Kind())
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		helloCounter.Inc()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"ok":true,"service":"md"}`))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":             true,
+			"service":        "md",
+			"broker_adapter": kind,
+		})
 	})
 
 	srv := &http.Server{
