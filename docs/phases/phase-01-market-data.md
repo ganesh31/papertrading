@@ -2,7 +2,7 @@
 
 **Week 2 · ~20 hrs**
 
-Goal: a single `BrokerAdapter` interface fed by historical NSE data (default dev mode), with the `angel_live` adapter present but optional. By the end, you can render candles for INFY and NIFTY at 100× speed from data sitting on your laptop.
+Goal: a single `BrokerAdapter` interface fed by historical NSE **equity** data (default dev mode), with the `angel_live` adapter present but optional. By the end, you can render candles for liquid cash symbols (e.g. INFY, RELIANCE) at 100× speed from data sitting on your laptop. **F&O / NFO** ingestion and replay are explicitly deferred to the [NFO asset module](../repo-layout.md) and later phases — no Phase 1 dependency on derivatives data.
 
 ## Core principle: replay-first
 
@@ -11,7 +11,7 @@ Goal: a single `BrokerAdapter` interface fed by historical NSE data (default dev
 - No dependency on Angel API keys, TOTP, or static IP whitelist.
 - **Deterministic** — same inputs produce same outputs, which is critical for Phase 9 (strategy backtest parity).
 - Works offline, at 100×/1000× speed, on any machine.
-- Lets you replay market-stress days (Budget day, covid-crash day, expiry Thursdays) on demand to test edge cases.
+- Lets you replay market-stress days (Budget day, covid-crash day, etc.) on demand to test edge cases. **Expiry / roll dynamics** stay in the NFO plug-in when you add it.
 
 The adapter interface is the contract; the rest of the system doesn't know or care which adapter is active.
 
@@ -65,14 +65,14 @@ flowchart LR
 
   subgraph Seed["One-off pt data fetch"]
     YF[yfinance<br/>1-min bars]
-    BHV[NSE Bhavcopy<br/>EOD]
-    FOBHV[NSE F&O Bhavcopy<br/>EOD settle]
+    BHV[NSE equity bhavcopy<br/>EOD]
     IMP[Importer<br/>Python]
     YF --> IMP
     BHV --> IMP
-    FOBHV --> IMP
     IMP --> BARS
   end
+
+  %% F&O bhavcopy / NFO seed — deferred to NFO asset module (not Phase 1)
 ```
 
 
@@ -82,16 +82,21 @@ flowchart LR
 
 | Tier                 | Source                                                                                                    | Auth                   | Segment               | Granularity                           | Use                         |
 | -------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------- | --------------------- | ------------------------------------- | --------------------------- |
-| Scrip master         | [Angel public JSON](https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json) | None                   | All NSE+BSE+NFO       | Static (daily refresh)                | Phases 1+                   |
+| Scrip master         | [Angel public JSON](https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json) | None                   | Full file has many segments; **Phase 1 filters to NSE equity** | Static (daily refresh)                | Phases 1+                   |
 | Intraday bars        | `yfinance` (Yahoo → NSE)                                                                                  | None                   | Equity cash + indices | 1m (7d back), 5m (60d), daily (years) | Phases 1–5, 9               |
 | Equity EOD OHLC      | [NSE Equity Bhavcopy](https://archives.nseindia.com/content/historical/EQUITIES/)                         | None                   | All NSE equity        | Daily                                 | Phase 6+, reconciliation    |
-| F&O EOD settlement   | [NSE F&O Bhavcopy](https://archives.nseindia.com/content/historical/DERIVATIVES/)                         | None                   | All F&O               | Daily settle price, OI                | Phases 6–10                 |
 | Index minute data    | NSE chart API (unofficial)                                                                                | None but needs cookies | Indices               | 1m intraday                           | Optional supplement         |
-| Option chain history | Upstox historical API (free with account)                                                                 | OAuth                  | F&O                   | 1m                                    | Phase 7 (optional)          |
 | Tick-level (paid)    | TrueData / GFDL                                                                                           | Paid                   | All                   | True tick                             | Only if you subscribe later |
 
+**Deferred (NFO / F&O plug-in, not Phase 1)**
 
-**What you get with just free sources**: everything needed for Phases 1–11 including strategy backtests. Tick granularity is *synthesized* from 1-min bars (see §1.4) — good enough for matching-engine behavior, stop-loss triggering, and strategy P&L. If you later need true tick data, swap in a paid source behind the same adapter.
+| Tier                 | Source                                                                                                    | Notes |
+| -------------------- | --------------------------------------------------------------------------------------------------------- | ----- |
+| F&O EOD settlement   | [NSE F&O bhavcopy](https://archives.nseindia.com/content/historical/DERIVATIVES/)                         | Wire when you implement margin / MTM / OI for derivatives. |
+| Option chain history | Upstox historical API (free with account)                                                               | Options phases / NFO module. |
+
+
+**What you get with free sources for equity-first Phases 1–6**: replay, candles, and equity-centric backtests without derivatives feeds. Tick granularity is *synthesized* from 1-min bars (see §1.4) — good enough for matching-engine behavior, stop-loss triggering, and strategy P&L on cash. When you add the NFO module, plug in F&O bhavcopy / chain history behind the same ingestion boundaries. If you later need true tick data, swap in a paid source behind the same adapter.
 
 ## Replay setup — step by step
 
@@ -122,7 +127,7 @@ curl -o infra/seed/scrip-master.json \
 pt instruments sync --file infra/seed/scrip-master.json
 ```
 
-This populates `ref.instruments` with ~80k rows. Filter to NSE + NFO only to keep it lean.
+This populates `ref.instruments` with ~80k rows. **Phase 1**: filter to **NSE equity** (cash) only to keep lean seed + replay; retain full rows in the raw file if you want, but don’t require NFO rows for this phase.
 
 ### 3. Fetch 1-minute bars for your dev universe
 
@@ -131,7 +136,7 @@ just data-fetch-minute
 # equivalent to:
 pt data fetch \
   --source=yfinance \
-  --symbols=NIFTY,BANKNIFTY,RELIANCE,INFY,TCS,HDFCBANK,ICICIBANK \
+  --symbols=RELIANCE,INFY,TCS,HDFCBANK,ICICIBANK,SBIN \
   --interval=1m \
   --days=7
 ```
@@ -144,19 +149,19 @@ Rows land in a new staging table `md.bars_1m (instrument_id, ts, open, high, low
 
 ```bash
 just data-fetch-bhavcopy -- --from=2026-04-10 --to=2026-04-20
-# downloads and unzips each day's cm<date>bhav.csv and fo<date>bhav.csv
-# into infra/seed/bhavcopy/<YYYY-MM-DD>/
-# then imports into md.bhav_eq and md.bhav_fo
+# Phase 1 (equity-first): downloads and unzips each day's cm<date>bhav.csv
+# into infra/seed/bhavcopy/<YYYY-MM-DD>/ then imports into md.bhav_eq.
+# F&O fo<date>bhav.csv → md.bhav_fo is deferred to the NFO plug-in / later phase.
 ```
 
-Two tables: `md.bhav_eq` (equity EOD OHLCV) and `md.bhav_fo` (F&O EOD settlement price + OI). Phases 6 and 10 consume these directly.
+**Phase 1**: populate **`md.bhav_eq`** only. **`md.bhav_fo`** (settlement + OI) ships with derivatives work — not required for equity replay or early portfolio phases.
 
 ### 5. Run a replay
 
 ```bash
-just replay -- --date=2026-04-17 --symbols=NIFTY,INFY --speed=100
+just replay -- --date=2026-04-17 --symbols=INFY,RELIANCE --speed=100
 # equivalent to:
-pt replay --date=2026-04-17 --symbols=NIFTY,INFY --speed=100 --ticks-per-bar=10
+pt replay --date=2026-04-17 --symbols=INFY,RELIANCE --speed=100 --ticks-per-bar=10
 ```
 
 What happens under the hood:
@@ -186,7 +191,7 @@ No code changes. The `BrokerAdapter` interface is the only public surface.
 
 - Download Angel's public `OpenAPIScripMaster.json` (no auth required — it's a static CDN URL).
 - Parse (Go, `encoding/json`), upsert into `ref.instruments`. Dedupe by `(exchange, tradingsymbol)`.
-- Filter: NSE equity + NFO only in v1.
+- Filter: **NSE equity (cash) for Phase 1**. NFO / CDS rows optional in DB for future plug-in; do not block equity replay on them.
 - CLI: `pt instruments sync [--force]`.
 - Schedule: daily 08:30 IST via scheduler (Phase 10); for now run manually.
 
@@ -195,8 +200,8 @@ No code changes. The `BrokerAdapter` interface is the only public surface.
 `infra/seed/fetch.py` with subcommands:
 
 - `fetch.py minute --symbols=... --days=...` → pulls from yfinance, writes `md.bars_1m`.
-- `fetch.py bhavcopy --from=... --to=...` → downloads equity + F&O bhavcopy zips, parses CSVs, writes `md.bhav_eq` + `md.bhav_fo`.
-- `fetch.py option-chain --date=... --underlying=...` → optional; for Phase 7.
+- `fetch.py bhavcopy --from=... --to=...` → downloads **equity** bhavcopy zips, parses CSVs, writes `md.bhav_eq`. **F&O bhavcopy** (`md.bhav_fo`) → add with NFO module.
+- `fetch.py option-chain ...` → deferred (options / NFO phase).
 
 Keep this tool out of the main service path. It runs infrequently and doesn't need to be Go.
 
@@ -276,7 +281,7 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 
 ### 1.6 Normalizer
 
-- Input: adapter-specific frames. Output: canonical `Tick { instrument_id, ts, ltp, bid_px, bid_qty, ask_px, ask_qty, volume, oi, source }`.
+- Input: adapter-specific frames. Output: canonical `Tick { instrument_id, ts, ltp, bid_px, bid_qty, ask_px, ask_qty, volume, oi, source }`. **`oi`** may stay zero for equity-only replay; populate when NFO feeds land.
 - Drop ticks older than 60 s (replay-bug guard).
 - Enrich `instrument_id` via contract master cache (Redis-backed, 24h TTL).
 - Tag `source = REPLAY | LIVE`.
@@ -289,7 +294,7 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 
 ### 1.8 WS fan-out
 
-- `services/go/md` exposes `/stream` accepting `{ subscribe: ["NIFTY", "INFY"] }`.
+- `services/go/md` exposes `/stream` accepting `{ subscribe: ["INFY", "RELIANCE"] }` (NSE cash symbols; indices optional later).
 - Gateway proxies FE connections.
 - Backpressure: bounded ring buffer per client; drop-oldest with warning metric.
 
@@ -309,7 +314,7 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 
 - `packages/config/market-hours.ts`.
 - Reads `infra/seed/holidays.json` (annual refresh).
-- Per-segment sessions (NSE_EQ, NFO, CDS).
+- Per-segment sessions: implement **NSE_EQ** for Phase 1. **NFO / CDS** calendar hooks — add when those segments are in scope (NFO plug-in).
 - `getSession(now, segment) -> 'PREOPEN' | 'OPEN' | 'CLOSED' | 'POSTCLOSE'`.
 - In **replay mode**, `now` is the virtual clock's time — so market hours logic "just works" against replayed sessions.
 
@@ -318,7 +323,7 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 ```makefile
 instruments-sync:       curl scrip master + pt instruments sync
 data-fetch-minute:      ./infra/seed/fetch.py minute --symbols=... --days=7
-data-fetch-bhavcopy:    ./infra/seed/fetch.py bhavcopy --from=... --to=...
+data-fetch-bhavcopy:    ./infra/seed/fetch.py bhavcopy --from=... --to=...  # equity cm* only in Phase 1
 data-refresh-all:       data-fetch-minute && data-fetch-bhavcopy
 replay:                 pt replay --date=... --symbols=... --speed=100
 replay-stop:            pt replay stop
@@ -351,14 +356,8 @@ create table md.bhav_eq (
   primary key (instrument_id, trade_date)
 );
 
-create table md.bhav_fo (
-  instrument_id text not null references ref.instruments,
-  trade_date    date not null,
-  open numeric(18,4), high numeric(18,4), low numeric(18,4), close numeric(18,4),
-  settle_price  numeric(18,4) not null,
-  open_interest bigint, chg_in_oi bigint, volume bigint,
-  primary key (instrument_id, trade_date)
-);
+-- Optional stub for NFO module: create when you implement F&O bhavcopy import.
+-- create table md.bhav_fo ( ... );
 ```
 
 ## Metrics
@@ -392,8 +391,8 @@ create table md.bhav_fo (
 
 - **yfinance 1-min limit is 7 rolling days**. Longer horizons need a scheduled fetch (Phase 10) that keeps extending the archive.
 - **yfinance returns UTC**; your system stores IST. Convert at import time.
-- **NIFTY ticker on yfinance is `^NSEI`**, BANK NIFTY is `^NSEBANK`. Equity symbols get `.NS` suffix (`INFY.NS`). Map these to your `instrument_id`s in the importer.
-- **F&O data is not on yfinance**. For F&O phases, use bhavcopy EOD settlement prices + synthesize bars inside the day if you need intraday (or skip intraday F&O for Phase 6 — settlement-price-based MTM is sufficient).
+- **Primary Phase 1 mapping**: NSE cash tickers use `.NS` on Yahoo (`INFY.NS`, `RELIANCE.NS`). **Indices** (`^NSEI`, `^NSEBANK`) are optional if you want benchmark charts — not required for equity-first replay.
+- **F&O data is not on yfinance** — out of scope for Phase 1. When you build NFO, use F&O bhavcopy (EOD settlement + OI) and/or paid feeds; document that in the NFO phase doc.
 - **TOTP refresh** on Angel live (when you get there) is a rite of passage — budget half a day.
 - **Dup ticks on reconnect**: dedup via `(instrument_id, ts)` primary key + `ON CONFLICT DO NOTHING`.
 - **Replay speed too high** → DB persistence becomes bottleneck. Profile; raise batch size before raising speed.
@@ -416,7 +415,7 @@ create table md.bhav_fo (
 - Angel SmartAPI WebSocket 2.0 (for Phase 11): [https://smartapi.angelbroking.com/docs/WebSocket2](https://smartapi.angelbroking.com/docs/WebSocket2)
 - `yfinance` docs + GitHub: [https://github.com/ranaroussi/yfinance](https://github.com/ranaroussi/yfinance)
 - NSE equity bhavcopy archives: [https://archives.nseindia.com/content/historical/EQUITIES/](https://archives.nseindia.com/content/historical/EQUITIES/)
-- NSE F&O bhavcopy archives: [https://archives.nseindia.com/content/historical/DERIVATIVES/](https://archives.nseindia.com/content/historical/DERIVATIVES/)
+- NSE F&O bhavcopy (for NFO module later): [https://archives.nseindia.com/content/historical/DERIVATIVES/](https://archives.nseindia.com/content/historical/DERIVATIVES/)
 - TimescaleDB continuous aggregates: [https://docs.timescale.com/use-timescale/latest/continuous-aggregates/](https://docs.timescale.com/use-timescale/latest/continuous-aggregates/)
 - Brownian bridge reference (Wikipedia → any stochastic-processes text).
 
@@ -445,8 +444,8 @@ Angel SmartAPI requires a whitelisted static IP before live WebSocket access wor
 
 ## Exit checklist
 
-- `just data-refresh-all` populates `md.bars_1m` + bhavcopy tables.
-- `just replay -- --date=<recent-trading-day> --symbols=NIFTY,INFY --speed=100` runs end-to-end; Grafana shows ticks flowing.
+- `just data-refresh-all` populates `md.bars_1m` + `md.bhav_eq` (equity EOD); F&O bhavcopy deferred.
+- `just replay -- --date=<recent-trading-day> --symbols=INFY,RELIANCE --speed=100` runs end-to-end; Grafana shows ticks flowing.
 - Running the same replay twice produces byte-identical tick logs (determinism test).
 - `MD_ADAPTER` env var switches between `nse_replay` and `angel_live` with no code change (angel_live may return "not configured" — that's fine).
 - ADR-0005 and ADR-0019 merged.

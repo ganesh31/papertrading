@@ -28,3 +28,4 @@ db/schema.sql
 
 # Infra volumes (if any bind-mounted)
 infra/volumes/
+.venv
