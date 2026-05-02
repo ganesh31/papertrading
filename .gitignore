@@ -30,4 +30,8 @@ db/schema.sql
 infra/volumes/
 # Angel scrip master (~30MB+); refresh: curl per docs/phases/phase-01-market-data.md
 infra/seed/scrip-master.json
+# Seed downloads (NSE bhav zips / extracted CSVs)
+infra/seed/bhavcopy/
+infra/seed/.venv/
+infra/seed/__pycache__/
 .venv

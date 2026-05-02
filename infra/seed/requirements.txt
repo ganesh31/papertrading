@@ -1,0 +1,6 @@
+# Python 3.11+ — one-off market data fetch (see docs/phases/phase-01-market-data.md)
+yfinance>=0.2.44
+pandas>=2.2
+requests>=2.32
+psycopg[binary]>=3.2
+python-dotenv>=1.0

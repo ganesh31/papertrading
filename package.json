@@ -23,20 +23,6 @@
     },
     "cz-emoji": {
       "conventional": true,
-      "scopes": [
-        "web",
-        "api-gateway",
-        "auth-svc",
-        "worker-svc",
-        "ui",
-        "config",
-        "deps",
-        "ci",
-        "docs",
-        "md",
-        "migrations",
-        "pt-cli"
-      ],
       "types": [
         {
           "emoji": "✨",
