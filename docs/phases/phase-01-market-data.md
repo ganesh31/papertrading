@@ -197,7 +197,7 @@ No code changes to *switch* adapters. The `BrokerAdapter` interface is the only 
 Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain fetch stay out of scope** until the NFO module and Phase 11 respectively.
 
 - [x] **1.1** Angel scrip master → parse → upsert `ref.instruments`, dedupe `(exchange, tradingsymbol)`, **NSE equity (cash) filter** for seed/replay, `pt instruments sync [--force]`.
-- [ ] **1.2** `infra/seed/fetch.py`: `minute` → `md.bars_1m`; `bhavcopy` → **equity only** → `md.bhav_eq`. Thin **`pt data fetch`** CLI (or `just` targets) that shells/invokes the Python tool — keep services Go, seed Python.
+- [x] **1.2** `infra/seed/fetch.py`: `minute` → `md.bars_1m`; `bhavcopy` → **equity only** → `md.bhav_eq`. Thin **`pt data fetch`** CLI (or `just` targets) that shells/invokes the Python tool — keep services Go, seed Python.
 - [ ] **1.3** `nse_replay` adapter: read `md.bars_1m` by date/symbols → tick synthesizer → virtual clock cadence → normalizer path; **`GET /replay/status`** (or equivalent) with `virtualTime`, `speed`, `ticksEmitted`; deterministic with `--seed` / session id.
 - [x] **1.4** Tick synthesizer (Brownian-bridge path in doc): OHLCV + volume + bid/ask placeholders; unit + determinism tests; **ADR-0019** merged.
 - [x] **1.5** `angel_live`: **stub only** — interface satisfier, `ErrNotConfigured` unless `MD_ADAPTER=angel_live` (full WS/auth Phase 11).
@@ -238,7 +238,7 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 ### Implementation tracker — A. Ingestion & adapters (§1.1–1.5)
 
 - [x] **`p1-1-1` / §1.1** — Migrations for `ref.instruments`, `md.bars_1m`, `md.bhav_eq`, `md.ticks` (hypertable); `pt instruments sync` (Angel JSON, NSE `-EQ` filter, upsert).
-- [ ] **`p1-1-2` / §1.2** — `infra/seed/fetch.py` (`minute`, `bhavcopy`) **done**; still need thin **`pt data fetch`** invoking Python and **`just`** targets (`instruments-sync`, `data-fetch-minute`, `data-fetch-bhavcopy`, `data-refresh-all`).
+- [x] **`p1-1-2` / §1.2** — `infra/seed/fetch.py` (`minute`, `bhavcopy`); **`pt data fetch minute|bhavcopy`** (prefers `infra/seed/.venv/bin/python3`); **`just`** targets `instruments-sync`, `data-fetch-minute`, `data-fetch-bhavcopy`, `data-refresh-all` (run `just` from repo root; seed venv + `pip install -r infra/seed/requirements.txt` once).
 - [ ] **`p1-1-3` / §1.3** — `nse_replay`: load `md.bars_1m` by date/symbols → tick synth → virtual clock → normalizer path; **`GET /replay/status`** (`virtualTime`, `speed`, `ticksEmitted`); deterministic session id / seed.
 - [x] **`p1-1-4` / §1.4** — `services/go/md/internal/ticksynth` + tests + **ADR-0019** (Accepted).
 - [x] **`p1-1-5` / §1.5** — `BrokerAdapter` + `MD_ADAPTER`; **`angel_live`** stub `ErrNotConfigured` (full WS Phase 11).
