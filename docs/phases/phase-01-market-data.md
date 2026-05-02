@@ -98,7 +98,7 @@ flowchart LR
 | Option chain history | Upstox historical API (free with account)                                                               | Options phases / NFO module. |
 
 
-**What you get with free sources for equity-first Phases 1–6**: replay, candles, and equity-centric backtests without derivatives feeds. Tick granularity is *synthesized* from 1-min bars (see §1.4) — good enough for matching-engine behavior, stop-loss triggering, and strategy P&L on cash. When you add the NFO module, plug in F&O bhavcopy / chain history behind the same ingestion boundaries. If you later need true tick data, swap in a paid source behind the same adapter.
+**What you get with free sources for equity-first Phases 1–6**: replay, candles, and equity-centric backtests without derivatives feeds. Tick granularity is *synthesized* from 1-min bars (see [§1.4 — Tick synthesizer](#14-tick-synthesizer)) — good enough for matching-engine behavior, stop-loss triggering, and strategy P&L on cash. When you add the NFO module, plug in F&O bhavcopy / chain history behind the same ingestion boundaries. If you later need true tick data, swap in a paid source behind the same adapter.
 
 ## Replay setup — step by step
 
@@ -192,6 +192,81 @@ No code changes to *switch* adapters. The `BrokerAdapter` interface is the only 
 
 ## Tasks (what you actually build this week)
 
+### Task checklist (equity replay path)
+
+Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain fetch stay out of scope** until the NFO module and Phase 11 respectively.
+
+- [x] **1.1** Angel scrip master → parse → upsert `ref.instruments`, dedupe `(exchange, tradingsymbol)`, **NSE equity (cash) filter** for seed/replay, `pt instruments sync [--force]`.
+- [ ] **1.2** `infra/seed/fetch.py`: `minute` → `md.bars_1m`; `bhavcopy` → **equity only** → `md.bhav_eq`. Thin **`pt data fetch`** CLI (or `just` targets) that shells/invokes the Python tool — keep services Go, seed Python.
+- [ ] **1.3** `nse_replay` adapter: read `md.bars_1m` by date/symbols → tick synthesizer → virtual clock cadence → normalizer path; **`GET /replay/status`** (or equivalent) with `virtualTime`, `speed`, `ticksEmitted`; deterministic with `--seed` / session id.
+- [x] **1.4** Tick synthesizer (Brownian-bridge path in doc): OHLCV + volume + bid/ask placeholders; unit + determinism tests; **ADR-0019** merged.
+- [x] **1.5** `angel_live`: **stub only** — interface satisfier, `ErrNotConfigured` unless `MD_ADAPTER=angel_live` (full WS/auth Phase 11).
+- [ ] **1.6** Normalizer: `DraftTick` / adapter frames → canonical **`Tick`**; 60 s staleness drop; instrument cache (e.g. Redis, 24 h TTL); `source = REPLAY | LIVE`.
+- [ ] **1.7** Persistence: batch `md.ticks`; hypertable + compression; **continuous aggregates** 1m/5m/15m/1h/1d + refresh policies.
+- [ ] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
+- [ ] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
+- [ ] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
+- [ ] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
+- [ ] **1.12** Exit artifacts: **ADR-0005** + ADR-0019; **Grafana** “Market Data” panels (tick rate, staleness, `md_adapter_reconnects_total`); **`docs/talking-points/phase-01.md`**.
+- [ ] **Metrics** (as in [Metrics](#metrics)): wire `md_*` + `replay_*` counters/gauges so the dashboard is honest.
+
+### Implementation tracker (repo sync)
+
+Use this block as a **second navigation layer**: each `###` below is its own “tab” in the editor outline / Markdown TOC; keep it in sync with project todos (`p1-1-*`, `p1-metrics`, `p1-test-integ`). **Legend:** `[x]` shipped in repo at last update, `[ ]` not done.
+
+**Jump:** [A. Ingestion & adapters](#p1-tracker-a) · [B. Pipeline & API](#p1-tracker-b) · [C. CLI & calendars](#p1-tracker-c) · [D. Exit & quality](#p1-tracker-d)
+
+| ID | § | Focus |
+| --- | --- | --- |
+| `p1-1-1` | 1.1 | DB + `pt instruments sync` |
+| `p1-1-2` | 1.2 | `fetch.py` + **`pt data fetch`** + `just` |
+| `p1-1-3` | 1.3 | `nse_replay` + virtual clock + `/replay/status` |
+| `p1-1-4` | 1.4 | Tick synthesizer + ADR-0019 |
+| `p1-1-5` | 1.5 | `angel_live` stub |
+| `p1-1-6` | 1.6 | Normalizer + Redis cache |
+| `p1-1-7` | 1.7 | Batch `md.ticks` + CAGGs |
+| `p1-1-8` | 1.8 | WS `/stream` + gateway |
+| `p1-1-9` | 1.9 | Redis Streams `ticks.v1` |
+| `p1-1-10` | 1.10 | Gateway REST |
+| `p1-1-11` | 1.11 | `pt replay` + market hours |
+| `p1-1-12` | 1.12 | Grafana + talking points |
+| `p1-metrics` | — | `md_*` / `replay_*` metrics |
+| `p1-test-integ` | Testing § | Testcontainers + determinism |
+
+<a id="p1-tracker-a"></a>
+
+### Implementation tracker — A. Ingestion & adapters (§1.1–1.5)
+
+- [x] **`p1-1-1` / §1.1** — Migrations for `ref.instruments`, `md.bars_1m`, `md.bhav_eq`, `md.ticks` (hypertable); `pt instruments sync` (Angel JSON, NSE `-EQ` filter, upsert).
+- [ ] **`p1-1-2` / §1.2** — `infra/seed/fetch.py` (`minute`, `bhavcopy`) **done**; still need thin **`pt data fetch`** invoking Python and **`just`** targets (`instruments-sync`, `data-fetch-minute`, `data-fetch-bhavcopy`, `data-refresh-all`).
+- [ ] **`p1-1-3` / §1.3** — `nse_replay`: load `md.bars_1m` by date/symbols → tick synth → virtual clock → normalizer path; **`GET /replay/status`** (`virtualTime`, `speed`, `ticksEmitted`); deterministic session id / seed.
+- [x] **`p1-1-4` / §1.4** — `services/go/md/internal/ticksynth` + tests + **ADR-0019** (Accepted).
+- [x] **`p1-1-5` / §1.5** — `BrokerAdapter` + `MD_ADAPTER`; **`angel_live`** stub `ErrNotConfigured` (full WS Phase 11).
+
+<a id="p1-tracker-b"></a>
+
+### Implementation tracker — B. Pipeline & API (§1.6–1.10)
+
+- [ ] **`p1-1-6` / §1.6** — Normalizer: adapter frames → canonical **Tick**; drop ticks older than 60 s vs wall clock “now”; Redis instrument cache (24 h TTL); `source` is `REPLAY` or `LIVE`.
+- [ ] **`p1-1-7` / §1.7** — Batch persist **`md.ticks`** (500 rows or 100 ms); continuous aggregates **1m / 5m / 15m / 1h / 1d** + refresh policies (compression already in migration).
+- [ ] **`p1-1-8` / §1.8** — **`/stream`** on `md` (subscribe JSON); gateway WebSocket proxy; per-client ring buffer, drop-oldest, metric.
+- [ ] **`p1-1-9` / §1.9** — Redis Streams **`ticks.v1`** (~1 h retention); consumer groups **`mm`**, **`strategy`**, **`surveillance`** (documented).
+- [ ] **`p1-1-10` / §1.10** — Gateway **`GET /instruments`**, **`GET /candles`**, **`GET /market/status`**, **`GET /replay/status`** (pass-through to `md`).
+
+<a id="p1-tracker-c"></a>
+
+### Implementation tracker — C. CLI & calendars (§1.11)
+
+- [ ] **`p1-1-11` / §1.11** — **`pt replay`** (+ `replay-stop`); **`packages/config/market-hours.ts`**; **`infra/seed/holidays.json`**; **NSE_EQ** session enum; replay “now” = virtual clock.
+
+<a id="p1-tracker-d"></a>
+
+### Implementation tracker — D. Exit & quality (§1.12 + metrics + testing)
+
+- [ ] **`p1-1-12` / §1.12** — Grafana **Market Data** dashboard; **`docs/talking-points/phase-01.md`**; link from `docs/talking-points/README.md`.
+- [ ] **`p1-metrics`** — Wire counters/gauges from [Metrics](#metrics) (`md_*`, `replay_*`) so Grafana matches reality.
+- [ ] **`p1-test-integ`** — [Testing](#testing): Testcontainers + seeded bars → replay; byte-identical tick log; candle / property checks where applicable.
+
 ### 1.1 Contract master ingestion
 
 - Download Angel's public `OpenAPIScripMaster.json` (no auth required — it's a static CDN URL).
@@ -208,12 +283,14 @@ No code changes to *switch* adapters. The `BrokerAdapter` interface is the only 
 - `fetch.py bhavcopy --from=... --to=...` → downloads **equity** bhavcopy zips, parses CSVs, writes `md.bhav_eq`. **F&O bhavcopy** (`md.bhav_fo`) → add with NFO module.
 - `fetch.py option-chain ...` → deferred (options / NFO phase).
 
+Expose the same operations from **`pt data fetch`** (Cobra) so docs and `just` recipes stay stable; implementation can delegate to this script.
+
 Keep this tool out of the main service path. It runs infrequently and doesn't need to be Go.
 
 ### 1.3 `nse_replay` adapter (Go, primary dev path)
 
 - Reads `md.bars_1m` for the target date + symbol set.
-- Calls tick synthesizer per bar (§1.4).
+- Calls tick synthesizer per bar (section **1.4**).
 - Publishes through normalizer at the cadence dictated by the virtual clock.
 - Stops at end of trading day or `--until` override.
 - Exposes progress over a gRPC/WS control channel: `GET /replay/status` → `{ virtualTime, speed, ticksEmitted }`.
@@ -322,6 +399,11 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 - Per-segment sessions: implement **NSE_EQ** for Phase 1. **NFO / CDS** calendar hooks — add when those segments are in scope (NFO plug-in).
 - `getSession(now, segment) -> 'PREOPEN' | 'OPEN' | 'CLOSED' | 'POSTCLOSE'`.
 - In **replay mode**, `now` is the virtual clock's time — so market hours logic "just works" against replayed sessions.
+
+### 1.12 Grafana + talking points (ship with the phase)
+
+- Provision a **Market Data** Grafana dashboard: tick rate, tick staleness, `md_adapter_reconnects_total` (meaningful once `angel_live` runs), WS client gauge if exposed.
+- Add **`docs/talking-points/phase-01.md`** (listed in [Deliverables](#deliverables)); link from [talking-points/README.md](../talking-points/README.md).
 
 ## `just` / CLI cheat sheet
 
