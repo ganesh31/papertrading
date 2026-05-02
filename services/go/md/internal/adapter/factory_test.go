@@ -46,10 +46,13 @@ func TestAngelLiveAdapter_Run_NotConfigured(t *testing.T) {
 }
 
 func TestNSEReplayAdapter_Run_ContextCancel(t *testing.T) {
-	var a NSEReplayAdapter
+	a, err := NewBroker(KindNSEReplay, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := a.Run(ctx, nil)
+	err = a.Run(ctx, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("want context.Canceled, got %v", err)
 	}

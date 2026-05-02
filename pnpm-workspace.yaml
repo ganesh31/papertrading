@@ -4,3 +4,5 @@ packages:
   - "packages/*"
 allowBuilds:
   lefthook: true
+patchedDependencies:
+  cz-emoji@1.3.2-canary.2: patches/cz-emoji@1.3.2-canary.2.patch

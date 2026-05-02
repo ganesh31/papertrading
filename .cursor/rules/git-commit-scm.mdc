@@ -1,0 +1,12 @@
+---
+description: COMMIT_EDITMSG — emoji + ≤100 char body lines (verified)
+globs: "**/.git/COMMIT_EDITMSG"
+alwaysApply: false
+---
+
+# Git commit message
+
+1. **Header:** `type(optional-scope): <emoji><subject>` — emoji required (`package.json` → `config.cz-emoji.types`).
+2. **Body:** If present, **each line ≤ 100 characters** (strict). Count before submit. **101 fails CI.**
+
+Do not output a body as one long line. Hard-wrap into multiple lines ≤ 100 chars each.

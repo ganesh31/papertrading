@@ -22,13 +22,17 @@ services:
     environment:
       MD_PORT: 6011
       MD_ADAPTER: ${MD_ADAPTER:-nse_replay}
+      DATABASE_URL: postgres://${POSTGRES_USER:-papertrading}:${POSTGRES_PASSWORD:-papertrading}@postgres:5432/${POSTGRES_DB:-papertrading}?sslmode=disable
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_SERVICE_NAME: md
     ports:
       - "6011:6011"
     networks: [papertrading]
     depends_on:
-      - tempo
+      postgres:
+        condition: service_healthy
+      tempo:
+        condition: service_started
 
   postgres:
     image: timescale/timescaledb:latest-pg16

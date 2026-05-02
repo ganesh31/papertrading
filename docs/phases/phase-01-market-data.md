@@ -135,6 +135,8 @@ This populates `ref.instruments` with ~80k rows. **Phase 1**: filter to **NSE eq
 
 ```bash
 just data-fetch-minute
+# narrower universe (positional: symbols, then days — do not pass symbols=...):
+# just data-fetch-minute INFY,RELIANCE 7
 # equivalent to:
 pt data fetch \
   --source=yfinance \
@@ -198,7 +200,7 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 
 - [x] **1.1** Angel scrip master → parse → upsert `ref.instruments`, dedupe `(exchange, tradingsymbol)`, **NSE equity (cash) filter** for seed/replay, `pt instruments sync [--force]`.
 - [x] **1.2** `infra/seed/fetch.py`: `minute` → `md.bars_1m`; `bhavcopy` → **equity only** → `md.bhav_eq`. Thin **`pt data fetch`** CLI (or `just` targets) that shells/invokes the Python tool — keep services Go, seed Python.
-- [ ] **1.3** `nse_replay` adapter: read `md.bars_1m` by date/symbols → tick synthesizer → virtual clock cadence → normalizer path; **`GET /replay/status`** (or equivalent) with `virtualTime`, `speed`, `ticksEmitted`; deterministic with `--seed` / session id.
+- [x] **1.3** `nse_replay` adapter: read `md.bars_1m` by date/symbols → tick synthesizer → virtual clock cadence → normalizer path (`RunHooks.OnTick` optional no-op); **`GET /replay/status`** with `virtualTime`, `speed`, `ticksEmitted`; **`POST /replay/start`** / **`POST /replay/stop`**; optional **`REPLAY_*`** env auto-run; deterministic **`sessionId`** (passed to tick synth seed).
 - [x] **1.4** Tick synthesizer (Brownian-bridge path in doc): OHLCV + volume + bid/ask placeholders; unit + determinism tests; **ADR-0019** merged.
 - [x] **1.5** `angel_live`: **stub only** — interface satisfier, `ErrNotConfigured` unless `MD_ADAPTER=angel_live` (full WS/auth Phase 11).
 - [ ] **1.6** Normalizer: `DraftTick` / adapter frames → canonical **`Tick`**; 60 s staleness drop; instrument cache (e.g. Redis, 24 h TTL); `source = REPLAY | LIVE`.
@@ -239,7 +241,7 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 
 - [x] **`p1-1-1` / §1.1** — Migrations for `ref.instruments`, `md.bars_1m`, `md.bhav_eq`, `md.ticks` (hypertable); `pt instruments sync` (Angel JSON, NSE `-EQ` filter, upsert).
 - [x] **`p1-1-2` / §1.2** — `infra/seed/fetch.py` (`minute`, `bhavcopy`); **`pt data fetch minute|bhavcopy`** (prefers `infra/seed/.venv/bin/python3`); **`just`** targets `instruments-sync`, `data-fetch-minute`, `data-fetch-bhavcopy`, `data-refresh-all` (run `just` from repo root; seed venv + `pip install -r infra/seed/requirements.txt` once).
-- [ ] **`p1-1-3` / §1.3** — `nse_replay`: load `md.bars_1m` by date/symbols → tick synth → virtual clock → normalizer path; **`GET /replay/status`** (`virtualTime`, `speed`, `ticksEmitted`); deterministic session id / seed.
+- [x] **`p1-1-3` / §1.3** — `nse_replay`: load `md.bars_1m` by IST calendar date + symbols (`INFY` → `INFY-EQ`) → tick synth → virtual clock → **`RunHooks.OnTick`** (no-op until §1.6); **`GET /replay/status`**, **`POST /replay/start`**, **`POST /replay/stop`**; optional **`REPLAY_DATE`**, **`REPLAY_SYMBOLS`**, **`REPLAY_SPEED`**, etc.; Timescale **`DATABASE_URL`** on **`md`** in Docker Compose.
 - [x] **`p1-1-4` / §1.4** — `services/go/md/internal/ticksynth` + tests + **ADR-0019** (Accepted).
 - [x] **`p1-1-5` / §1.5** — `BrokerAdapter` + `MD_ADAPTER`; **`angel_live`** stub `ErrNotConfigured` (full WS Phase 11).
 

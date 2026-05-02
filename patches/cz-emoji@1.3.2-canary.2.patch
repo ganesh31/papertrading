@@ -1,0 +1,24 @@
+diff --git a/index.js b/index.js
+index 50340478f67ecd114653bb1ab0f325cf9793fb4a..1ddd5a9fc53eeac4c26203c42da94e9903fc2b41 100644
+--- a/index.js
++++ b/index.js
+@@ -61,7 +61,8 @@ function getEmojiChoices({ types, symbol }) {
+   return types.map(choice => ({
+     name: `${pad(choice.name, maxNameLength)}  ${choice.emoji}  ${choice.description}`,
+     value: {
+-      emoji: symbol ? `${choice.emoji} ` : choice.code,
++      // Unicode when symbol:true; :shortcode: when false. No trailing space — format adds spacing.
++      emoji: symbol ? choice.emoji : choice.code,
+       name: choice.name
+     },
+     code: choice.code
+@@ -164,7 +165,8 @@ function formatCommitMessage(answers, config) {
+   const { columns } = process.stdout
+ 
+   const emoji = answers.type
+-  const type = config.types.find(type => type.code === emoji.emoji).name
++  // value.emoji is :code: or unicode; value.name is always the conventional type (feat, fix, …).
++  const type = emoji.name
+   const scope = answers.scope ? '(' + answers.scope.trim() + ')' : ''
+   const subject = answers.subject.trim()
+ 

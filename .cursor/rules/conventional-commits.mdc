@@ -1,0 +1,97 @@
+---
+description: Conventional commits + cz-emoji; strict ≤100 chars per body line (verified before send)
+alwaysApply: true
+---
+
+# Git commit messages (Conventional Commits + cz-emoji)
+
+When proposing or writing a **git commit message** (chat, agent, or SCM UI), follow this repo’s tooling.
+
+**Generate-commit / Source Control:** Prefer **`.cursorrules`** and **`CLAUDE.md`** for the model—they mirror the **non‑negotiable** bits below (emoji + body width). Never strip emoji; never emit body lines over 100 characters.
+
+## Non‑negotiable summary
+
+| Rule | Detail |
+|------|--------|
+| Emoji | First line includes Unicode emoji after `:` per `config.cz-emoji.types`. |
+| Body width | **Each body line ≤ 100 chars** (inclusive). **101 = invalid.** |
+
+## Body line length — strict
+
+**Every body line must contain at most 100 characters** (commitlint `body-max-line-length`). This is **hard**: a line with **101** characters fails CI.
+
+1. Output the body as **multiple physical newline-terminated lines**. **Never** one long line that depends on the viewer to wrap.
+2. **After drafting, verify each body line:** count characters from first character of the line through the last visible character **before** `\n`. Spaces and punctuation count. Emoji in the body count like other Unicode chars (use same counting commitlint uses: string length / code units).
+3. **If any line measures > 100**, rewrite: split at a space earlier, or shorten wording, until **every** body line is ≤ 100.
+4. Prefer breaks at spaces near column ~90–100; avoid mid-word splits unless unavoidable.
+
+**Wrong:** a single body line with 120 characters.
+**Right:** two lines, lengths e.g. 78 and 55.
+
+Do not skip verification. Messages that violate line length are invalid for this repo.
+
+## Header (first line)
+
+- **`type` (required):** must be exactly one of the **`name`** values in `package.json` → **`config.cz-emoji.types`** (the `types` array; e.g. lines ~26–93). **Do not** use any other type string for this repo (no `wip`, `feature`, `misc`, …).
+- **`emoji` (required):** must be the **`emoji`** character from the **same** object as that `name` (not the `:code:` string in the commit message). If `package.json` and the cheat table below disagree, **`package.json` wins**—update the table when you change types.
+- **After `:`** there must be **exactly one space** (required by the conventional parser / commitlint).
+- **No space** between the **emoji** and the **first character** of the subject (treat emoji + subject as one token: `✨Stream`, not `✨ Stream`).
+- **Scope**: optional; lowercase; short. Omit when unused — `feat:` not `feat():`.
+- **Subject** (on the header line): imperative, terse, no filler, no trailing period. Keep the **whole header ≤ 100 characters** (`header-max-length`).
+
+**Format:**
+
+```text
+type(optional-scope): <emoji><short subject>
+```
+
+Do **not** put the emoji before the type (`✨ feat(md): …` fails commitlint).
+
+**Examples (header only):**
+
+```text
+feat(md): ✨stream replay ticks over WS
+fix(pt-cli): 🐛handle nil config when path unset
+docs: 📚align Angel IP note with order vs MD
+```
+
+## Longer text = body (multiline)
+
+Put anything beyond a short subject in the **body**: blank line after the header, then lines **≤ 100 characters each** (see § Body line length — strict).
+
+**Body tone:** keep it **short and plain**. Prefer simple, common words. State **what** changed and **why** in direct sentences. Skip filler (“in order to”, “it is worth noting”, “leverages”, “robust”, “seamlessly”), marketing tone, and long clauses. If the header is enough, **omit the body**.
+
+**Example** (each body line ≤ 100; blank line after header):
+
+```text
+feat(md): ✨publish ticks after normalize
+
+Run DraftTick through the normalizer before Redis. Downstream only
+sees Tick. Replay and live use the same path here.
+```
+
+**Example** (long sentence split so no line exceeds 100):
+
+```text
+docs: 📚document Angel IP whitelist for orders vs market data
+
+Angel ties IP whitelist mainly to order APIs. Session and market-data
+WS work from the app’s registered public IP for dev. Phase 11 stays
+replay-first for determinism, not home IP blocking.
+```
+
+## Type → emoji (mirror of `config.cz-emoji.types` in package.json)
+
+| `name` (`type`) | `emoji` |
+| --------------- | ------- |
+| feat            | ✨      |
+| fix             | 🐛      |
+| docs            | 📚      |
+| style           | 💎      |
+| refactor        | 📦      |
+| perf            | ⚡️     |
+| test            | ✅      |
+| build           | 🛠      |
+| ci              | 👷      |
+| chore           | ♻️      |
+| revert          | ⏪      |

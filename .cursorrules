@@ -1,0 +1,37 @@
+# Git commit messages — read first for generate-commit / SCM
+
+**Emoji on the header line is mandatory.** Do not output plain `feat:` / `fix:` / `docs:` without the Unicode emoji from this repo’s mapping. `feat(scope): subject` without emoji is invalid here.
+
+**Body lines: hard limit 100 characters each.** Commitlint counts characters per **physical line** (including spaces). **101 characters on any body line fails CI.** Do not rely on the editor’s soft wrap—manually break lines. Before you output the final message, **verify every body line**: length must be **≤ 100** (most editor status bars show column at caret; or count). If unsure, shorten or split.
+
+---
+
+## Header
+
+- Format: `type(optional-scope): <emoji><subject>`
+- Exactly **one space** after `:` (required by commitlint). **No space** between `<emoji>` and the first letter of `<subject>`.
+- **`type`**: must match a `name` in `package.json` → `config.cz-emoji.types`.
+- **`emoji`**: must match the `emoji` field for that same entry (literal Unicode character in the message — not `:sparkles:` markup).
+- Full header line ≤ 100 characters total.
+
+## Type → emoji (mirror `config.cz-emoji.types`; package.json wins if drift)
+
+feat ✨ · fix 🐛 · docs 📚 · style 💎 · refactor 📦 · perf ⚡️ · test ✅ · build 🛠 · ci 👷 · chore ♻️ · revert ⏪
+
+## Examples
+
+`feat(md): ✨stream ticks over websocket`
+`fix(pt-cli): 🐛handle missing config path`
+`docs: 📚align Angel SmartAPI IP notes`
+
+## Body (optional)
+
+1. One blank line between header and body.
+2. Each body line: **at most 100 characters** — **never 101+**.
+3. Break long sentences at word boundaries near column ~100; continue on the next line.
+4. Terse, plain wording.
+
+**Bad:** one paragraph line running 200+ characters (will fail commitlint).
+**Good:** several lines, each ≤ 100 characters.
+
+(Full detail: `.cursor/rules/conventional-commits.mdc`)

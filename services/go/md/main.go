@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
+	"github.com/ganesh/papertrading/services/go/md/internal/replay"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -68,14 +70,37 @@ func main() {
 	shutdownTracer := initTracer(ctx)
 	defer func() { _ = shutdownTracer(context.Background()) }()
 
-	broker, err := adapter.NewFromEnv()
+	kind, err := adapter.KindFromEnv()
+	if err != nil {
+		log.Fatalf("broker adapter kind: %v", err)
+	}
+
+	adapterCtx, stopAdapter := context.WithCancel(ctx)
+	defer stopAdapter()
+
+	dsn := os.Getenv("DATABASE_URL")
+	var pool *pgxpool.Pool
+	if dsn != "" {
+		pool, err = pgxpool.New(ctx, dsn)
+		if err != nil {
+			log.Printf("md: DATABASE_URL pool open failed (replay DB idle): %v", err)
+			pool = nil
+		} else {
+			defer pool.Close()
+		}
+	}
+
+	var coord *replay.Coordinator
+	if kind == adapter.KindNSEReplay {
+		coord = replay.NewCoordinator(adapterCtx, pool)
+	}
+
+	broker, err := adapter.NewBroker(kind, coord)
 	if err != nil {
 		log.Fatalf("broker adapter: %v", err)
 	}
 	log.Printf("md broker adapter: %s", broker.Kind())
 
-	adapterCtx, stopAdapter := context.WithCancel(ctx)
-	defer stopAdapter()
 	go func() {
 		err := broker.Run(adapterCtx, nil)
 		switch {
@@ -101,18 +126,26 @@ func main() {
 	})
 	prometheus.MustRegister(helloCounter)
 
-	kind := string(broker.Kind())
+	brokerKind := string(broker.Kind())
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		helloCounter.Inc()
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		h := map[string]any{
 			"ok":             true,
 			"service":        "md",
-			"broker_adapter": kind,
-		})
+			"broker_adapter": brokerKind,
+		}
+		if coord != nil && pool != nil {
+			h["replay_db"] = true
+		}
+		_ = json.NewEncoder(w).Encode(h)
 	})
+
+	if coord != nil {
+		coord.RegisterHTTP(mux)
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(port),
