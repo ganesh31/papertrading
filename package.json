@@ -34,7 +34,76 @@
         "ci",
         "docs",
         "md",
-        "migrations"
+        "migrations",
+        "pt-cli"
+      ],
+      "types": [
+        {
+          "emoji": "✨",
+          "code": ":sparkles:",
+          "description": "A new feature.",
+          "name": "feat"
+        },
+        {
+          "emoji": "🐛",
+          "code": ":bug:",
+          "description": "A bug fix.",
+          "name": "fix"
+        },
+        {
+          "emoji": "📚",
+          "code": ":books:",
+          "description": "Documentation only changes.",
+          "name": "docs"
+        },
+        {
+          "emoji": "💎",
+          "code": ":gem:",
+          "description": "Formatting, punctuation, etc.; no logic change.",
+          "name": "style"
+        },
+        {
+          "emoji": "📦",
+          "code": ":package:",
+          "description": "Refactoring production code.",
+          "name": "refactor"
+        },
+        {
+          "emoji": "⚡️",
+          "code": ":zap:",
+          "description": "A code change that improves performance.",
+          "name": "perf"
+        },
+        {
+          "emoji": "✅",
+          "code": ":white_check_mark:",
+          "description": "Adding or updating tests.",
+          "name": "test"
+        },
+        {
+          "emoji": "🛠",
+          "code": ":hammer_and_wrench:",
+          "description": "Build system or external dependencies.",
+          "name": "build"
+        },
+        {
+          "emoji": "👷",
+          "code": ":construction_worker:",
+          "description": "CI configuration or scripts.",
+          "name": "ci"
+        },
+        {
+          "emoji": "♻️",
+          "code": ":recycle:",
+          "description": "Other changes that do not touch src or test files.",
+          "name": "chore"
+        },
+        {
+          "emoji": "⏪",
+          "code": ":rewind:",
+          "description": "Reverts a previous commit.",
+          "name": "revert"
+        }
       ]
     }
   },

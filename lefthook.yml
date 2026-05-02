@@ -11,10 +11,14 @@ pre-commit:
       glob: "services/gateway/**/*.{ts,tsx,js}"
       run: pnpm -C services/gateway lint
 
+    # Root go.mod has no packages; Go services live in nested modules under services/go/.
     lint-go:
-      glob: "*.go"
-      run: go vet ./...
+      glob: "services/go/**/*.go"
+      run: |
+        set -e
+        (cd services/go/md && go vet ./...)
+        (cd services/go/matching && go vet ./...)
 
     format-go:
-      glob: "*.go"
+      glob: "services/go/**/*.go"
       run: gofmt -l {staged_files}

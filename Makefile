@@ -14,6 +14,8 @@ migrate:
 
 check:
 	pnpm check
+	go test ./...
+	go build -o /dev/null ./cmd/pt
 	(cd services/go/md && go test ./...)
 	(cd services/go/matching && go test ./...)
 
