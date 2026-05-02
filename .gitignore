@@ -23,6 +23,10 @@ bin/
 *.test
 *.out
 
+# Python
+__pycache__/
+*.py[cod]
+
 # dbmate generated schema dumps
 db/schema.sql
 

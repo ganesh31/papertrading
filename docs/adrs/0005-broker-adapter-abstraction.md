@@ -6,9 +6,9 @@
 
 ## Context
 
-Market data can come from **replay** (deterministic, offline-friendly, no broker credentials) or **live broker feeds** (Angel SmartAPI WebSocket, static IP, TOTP). Downstream components (normalizer, persistence, WS fan-out, strategies) should depend on a **single contract**, not on vendor SDKs or replay-specific loops.
+Market data can come from **replay** (deterministic, offline-friendly, no broker credentials) or **live broker feeds** (Angel SmartAPI WebSocket after session login, e.g. TOTP). Angel’s **IP whitelist** is primarily associated with **order-placement** APIs, not with replay and often not with **market-data** WebSocket from a registered client IP—confirm in Angel’s dashboard and docs. Downstream components (normalizer, persistence, WS fan-out, strategies) should depend on a **single contract**, not on vendor SDKs or replay-specific loops.
 
-Phase 1 is replay-first; live Angel wiring is deferred to Phase 11. We still need a stable seam so switching `MD_ADAPTER` requires **no code changes** outside the adapter registry.
+Phase 1 is replay-first; full **`angel_live`** implementation is deferred to Phase 11 for schedule and hardening, not because residential IP inherently blocks SmartAPI market data. We still need a stable seam so switching `MD_ADAPTER` requires **no code changes** outside the adapter registry.
 
 ## Decision
 
@@ -25,7 +25,7 @@ Adapter output before full normalization is modeled as **`DraftTick`** + **`RunH
 
 **Positive**
 
-- Deterministic replay stays the default development path; no API keys or static IP for Phases 1–10.
+- Deterministic replay stays the default development path; no broker API keys (or session churn) required for Phases 1–10 when using `nse_replay`.
 - Vendor churn (Angel vs Kite vs paid ticks) is isolated behind adapters.
 - Metrics and ops can label behavior by `adapter` dimension consistently.
 

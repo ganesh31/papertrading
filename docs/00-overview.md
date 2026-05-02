@@ -94,7 +94,7 @@ Budget: ~3 hours/day, target ~14–16 weeks. Phases overlap slightly; one demoab
 | 15    | 10 — Settlement     | EOD jobs, T+1, contract notes; extended for NFO lifecycle               |
 | 16+   | 11 — Hardening      | Load + chaos tests, deployment, demo                                    |
 
-¹ **Replay-first**: all of Phases 1–10 run on historical data via the `nse_replay` adapter — deterministic, offline, and fast-forwardable. The `angel_live` adapter is stubbed in Phase 1 but only wired up in Phase 11 when you have a VPS with a static IP. See [phases/phase-01-market-data.md](./phases/phase-01-market-data.md#core-principle-replay-first) for data sources and setup.
+¹ **Replay-first**: all of Phases 1–10 run on historical data via the `nse_replay` adapter — deterministic, offline, and fast-forwardable. The `angel_live` adapter is stubbed in Phase 1 and fully implemented in Phase 11 for **milestone / ops** reasons, **not** because Angel SmartAPI market data requires a datacenter static IP (IP whitelist is mainly an **order API** concern; live MD can work from a registered **current** IP). See [phases/phase-01-market-data.md](./phases/phase-01-market-data.md#angel-smartapi-orders-vs-market-data-and-ip).
 
 ## Non-goals (call these out)
 

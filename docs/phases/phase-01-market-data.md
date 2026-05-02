@@ -6,12 +6,14 @@ Goal: a single `BrokerAdapter` interface fed by historical NSE **equity** data (
 
 ## Core principle: replay-first
 
-**Default mode is `nse_replay`.** Angel live is deferred to Phase 11 (see [Static IP strategy](#static-ip-strategy) below). Everything you build Phases 1–10 uses replay, because:
+**Default mode is `nse_replay`.** Full **`angel_live`** production wiring stays a later milestone (Phase 11 in this repo), but that schedule is about **focus and hardening**, not because Angel blocks market data from a home IP. Everything you build Phases 1–10 targets replay, because:
 
-- No dependency on Angel API keys, TOTP, or static IP whitelist.
+- No dependency on Angel API keys, TOTP, or session refresh while iterating.
 - **Deterministic** — same inputs produce same outputs, which is critical for Phase 9 (strategy backtest parity).
 - Works offline, at 100×/1000× speed, on any machine.
 - Lets you replay market-stress days (Budget day, covid-crash day, etc.) on demand to test edge cases. **Expiry / roll dynamics** stay in the NFO plug-in when you add it.
+
+See [Angel SmartAPI: orders vs market data and IP](#angel-smartapi-orders-vs-market-data-and-ip) for how API keys and IP whitelist interact (static IP is **not** required for live **market data** in the usual Angel setup if you are not placing orders through their order APIs).
 
 The adapter interface is the contract; the rest of the system doesn't know or care which adapter is active.
 
@@ -20,7 +22,7 @@ The adapter interface is the contract; the rest of the system doesn't know or ca
 - Phase 0 complete.
 - Python 3.11+ installed (for the one-off data fetcher script; the services themselves are Go).
 - ~5 GB free disk for ~1 year of 1-min bars for ~50 symbols.
-- **Optional**: Angel One account + static IP, only if you want to try live before Phase 11.
+- **Optional**: Angel One SmartAPI **API key + secret** (+ TOTP secret for login) if you want to experiment with **`angel_live`** market data from your machine. Register the app with your **current public IP** if you are **not** using Angel’s order-placement APIs (this project’s live orders stay in-house). A **dedicated / static IP or VPS** matters mainly when you need stable egress or when calling **order** endpoints that enforce IP whitelist—confirm on the Angel developer dashboard.
 
 ## Deliverables
 
@@ -174,16 +176,19 @@ What happens under the hood:
 
 Open Grafana → the Market Data dashboard should show ticks flowing.
 
-### 6. Switch to live (only when you're ready, Phase 11)
+### 6. Switch to live market data (optional; after `angel_live` is implemented)
 
 ```bash
 export MD_ADAPTER=angel_live
-# plus ANGEL_API_KEY, ANGEL_CLIENT_CODE, ANGEL_TOTP_SECRET in .env
-# and your source IP whitelisted on the Angel API dashboard
+# plus ANGEL_API_KEY, ANGEL_SECRET_KEY, ANGEL_CLIENT_CODE, ANGEL_TOTP_SECRET (or whatever
+# env names the adapter expects) in .env — see SmartAPI login docs.
+# Register your SmartAPI app with the public IP you will use for outbound calls.
+# IP whitelist on Angel is primarily for *order* APIs; market-data WebSocket typically
+# works with a normal residential IP once the app + credentials are correct.
 docker compose restart md
 ```
 
-No code changes. The `BrokerAdapter` interface is the only public surface.
+No code changes to *switch* adapters. The `BrokerAdapter` interface is the only public surface. Until Phase 11, `angel_live` may still return `ErrNotConfigured` if the stub is not filled in.
 
 ## Tasks (what you actually build this week)
 
@@ -271,7 +276,7 @@ Write ADR-0019 capturing: what synthesis preserves (OHLCV integrity, directional
 
 Full spec, but skip implementation for now:
 
-- Auth: TOTP-based login → session token → WS connection.
+- Auth: TOTP-based login → session token → WS connection (works from **current** public IP once the Angel app is registered for that IP; **static IP is not a prerequisite for WebSocket market data** in the common Angel model—order APIs are the usual IP-whitelist surface).
 - Binary frame format per SmartAPI WebSocket 2.0.
 - Subscribe up to 50 symbols (tier limit).
 - Heartbeats + reconnect with exponential backoff (1s → 60s), resubscribe all tokens on reconnect.
@@ -419,28 +424,36 @@ create table md.bhav_eq (
 - TimescaleDB continuous aggregates: [https://docs.timescale.com/use-timescale/latest/continuous-aggregates/](https://docs.timescale.com/use-timescale/latest/continuous-aggregates/)
 - Brownian bridge reference (Wikipedia → any stochastic-processes text).
 
-## Static IP strategy (for Phase 11 live)
+## Angel SmartAPI: orders vs market data and IP
 
-Angel SmartAPI requires a whitelisted static IP before live WebSocket access works. You do **not** need this for Phases 1–10. Options for when you do get to live:
+Angel’s developer console distinguishes **what** is tied to your registered IP. In practice (verify against [SmartAPI](https://smartapi.angelbroking.com/docs) and your live dashboard):
 
+- **Order placement / trading REST APIs** — often where a **fixed IP whitelist** applies. Relevant only if you route **real** broker orders through Angel. **This paper-trading system does not send customer orders to the exchange**, so you may never need a static IP for product goals.
+- **Login + session + market-data WebSocket** — typically usable from the **public IP you register on the app** (including a normal home/office IP that changes when your ISP renews DHCP). Registering the app with your **current** IP and API key + secret (+ TOTP) is enough to try live ticks for development.
 
-| #   | Option                                        | Cost                           | When to use                              |
-| --- | --------------------------------------------- | ------------------------------ | ---------------------------------------- |
-| 1   | **Replay-only during dev → VPS for Phase 11** | ₹0 now; ~₹400/mo from Phase 11 | **Recommended.** Matches the plan.       |
-| 2   | Cheap VPS + WireGuard tunnel from laptop      | ~₹400/mo                       | Want live Angel on laptop during dev.    |
-| 3   | ISP static IP add-on (Airtel / ACT / Jio biz) | ₹500–1500/mo                   | If you already want one.                 |
-| 4   | Commercial VPN with dedicated IP              | ~$2–5/mo                       | Quick, but some IP ranges get blocked.   |
-| 5   | Nuvama / Kite Connect adapter instead         | Varies                         | If their whitelist rules are friendlier. |
+**Why Phases 1–10 still default to `nse_replay`:** determinism, offline work, and speed—not because WebSocket “requires a datacenter IP.”
 
+**When a VPS, static IP, or tunnel still makes sense**
 
-### Option 2 recipe (laptop live)
+| #   | Option | Cost (rough) | When to use |
+| --- | ------ | -------------- | ----------- |
+| 1   | **Replay-only dev** | ₹0 | Default: backtests and CI stay deterministic without broker sessions. |
+| 2   | **Laptop + SmartAPI with current IP** | ₹0 | Live **market data** experiments; re-register or update the app IP if your ISP changes your address. |
+| 3   | **Small VPS with stable egress** | ~₹400/mo | Always-on demo, scheduled jobs, or you want one IP that rarely changes. |
+| 4   | **VPS + WireGuard from laptop** | ~₹400/mo | Angel app must pin to one egress IP but you develop from changing networks. |
+| 5   | **ISP static IP / dedicated commercial VPN** | varies | You **do** call Angel **order** APIs from automation, or Angel policy requires a fixed range. |
+| 6   | **Alternate broker adapter** (e.g. Kite) | varies | Different IP or auth rules fit your hosting model better. |
+
+### WireGuard tunnel recipe (fixed egress from a laptop)
+
+Use when the Angel app IP **must** stay constant but your laptop’s IP does not.
 
 - Rent Hetzner CX22 or Vultr/DigitalOcean $4 droplet.
 - Install WireGuard on VPS; generate a client config.
 - On laptop: `sudo wg-quick up angel-tunnel` before running `md`.
 - Route only outbound Angel hosts through the tunnel via `AllowedIPs`.
-- Register the VPS IP on Angel API dashboard.
-- Runbook: `infra/runbooks/angel-tunnel.md`.
+- Register the **VPS** public IP on the Angel API dashboard.
+- Runbook: `infra/runbooks/angel-tunnel.md` (when added).
 
 ## Exit checklist
 
