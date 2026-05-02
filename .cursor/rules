@@ -1,0 +1,7 @@
+When generating git commit messages:
+- Follow Conventional Commits specification (feat, fix, docs, style, refactor, test, chore, etc.)
+- Use the emoji from the cz-emoji package mapping for the commit type
+- Format: <emoji> <type>(<scope>): <short description>
+- Subject line: terse and direct, no filler words, no flowery language
+- Body (optional): explain why and how, but each line must be max 100 characters
+- Wrap body lines at 100 chars — never exceed it
