@@ -28,4 +28,6 @@ db/schema.sql
 
 # Infra volumes (if any bind-mounted)
 infra/volumes/
+# Angel scrip master (~30MB+); refresh: curl per docs/phases/phase-01-market-data.md
+infra/seed/scrip-master.json
 .venv

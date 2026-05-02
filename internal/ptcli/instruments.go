@@ -13,12 +13,12 @@ var instrumentsSyncCmd = &cobra.Command{
 	Use:          "sync",
 	Short:        "Upsert Angel OpenAPIScripMaster JSON into ref.instruments",
 	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return ErrInstrumentsSyncNotImplemented
-	},
+	RunE:         runInstrumentsSync,
 }
 
 func init() {
-	instrumentsSyncCmd.Flags().Bool("force", false, "Re-sync even when metadata is considered fresh (reserved for P1-T03)")
+	instrumentsSyncCmd.Flags().String("file", "", "Path to OpenAPIScripMaster.json (default: download from Angel public CDN)")
+	instrumentsSyncCmd.Flags().String("database-url", "", "Postgres URL (default: $DATABASE_URL)")
+	instrumentsSyncCmd.Flags().Bool("force", false, "Reserved: bypass freshness / TTL checks when implemented")
 	instrumentsCmd.AddCommand(instrumentsSyncCmd)
 }
