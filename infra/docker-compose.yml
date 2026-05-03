@@ -23,6 +23,7 @@ services:
       MD_PORT: 6011
       MD_ADAPTER: ${MD_ADAPTER:-nse_replay}
       DATABASE_URL: postgres://${POSTGRES_USER:-papertrading}:${POSTGRES_PASSWORD:-papertrading}@postgres:5432/${POSTGRES_DB:-papertrading}?sslmode=disable
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_SERVICE_NAME: md
     ports:
@@ -30,6 +31,8 @@ services:
     networks: [papertrading]
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       tempo:
         condition: service_started

@@ -203,7 +203,7 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 - [x] **1.3** `nse_replay` adapter: read `md.bars_1m` by date/symbols → tick synthesizer → virtual clock cadence → normalizer path (`RunHooks.OnTick` optional no-op); **`GET /replay/status`** with `virtualTime`, `speed`, `ticksEmitted`; **`POST /replay/start`** / **`POST /replay/stop`**; optional **`REPLAY_*`** env auto-run; deterministic **`sessionId`** (passed to tick synth seed).
 - [x] **1.4** Tick synthesizer (Brownian-bridge path in doc): OHLCV + volume + bid/ask placeholders; unit + determinism tests; **ADR-0019** merged.
 - [x] **1.5** `angel_live`: **stub only** — interface satisfier, `ErrNotConfigured` unless `MD_ADAPTER=angel_live` (full WS/auth Phase 11).
-- [ ] **1.6** Normalizer: `DraftTick` / adapter frames → canonical **`Tick`**; 60 s staleness drop; instrument cache (e.g. Redis, 24 h TTL); `source = REPLAY | LIVE`.
+- [x] **1.6** Normalizer: `DraftTick` → canonical **`adapter.Tick`** (`bid_px`/`ask_px` pointers, `oi` zero for equity); **60 s staleness** vs wall clock for **`LIVE` only** (replay uses historical timestamps); **Redis + in-process** instrument cache **24 h TTL** (`md:inst:v1:{instrument_id}` JSON, Postgres on miss); `source = REPLAY | LIVE`; **`RunHooks.OnNormalizedTick`** (persist/bus §1.7+).
 - [ ] **1.7** Persistence: batch `md.ticks`; hypertable + compression; **continuous aggregates** 1m/5m/15m/1h/1d + refresh policies.
 - [ ] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
 - [ ] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
@@ -249,7 +249,7 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 
 ### Implementation tracker — B. Pipeline & API (§1.6–1.10)
 
-- [ ] **`p1-1-6` / §1.6** — Normalizer: adapter frames → canonical **Tick**; drop ticks older than 60 s vs wall clock “now”; Redis instrument cache (24 h TTL); `source` is `REPLAY` or `LIVE`.
+- [x] **`p1-1-6` / §1.6** — `internal/normalize`: adapter **`DraftTick`** → **`Tick`**; **LIVE-only** staleness (60 s vs `time.Now()`); **`REDIS_URL`** optional (`redis://…`); Redis key **`md:inst:v1:{id}`** + **24 h** in-process TTL; **`WrapWithNormalizer`** chains **`OnNormalizedTick`**; Compose **`md`** sets **`REDIS_URL`** to **`redis`**.
 - [ ] **`p1-1-7` / §1.7** — Batch persist **`md.ticks`** (500 rows or 100 ms); continuous aggregates **1m / 5m / 15m / 1h / 1d** + refresh policies (compression already in migration).
 - [ ] **`p1-1-8` / §1.8** — **`/stream`** on `md` (subscribe JSON); gateway WebSocket proxy; per-client ring buffer, drop-oldest, metric.
 - [ ] **`p1-1-9` / §1.9** — Redis Streams **`ticks.v1`** (~1 h retention); consumer groups **`mm`**, **`strategy`**, **`surveillance`** (documented).

@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
+	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -101,8 +103,26 @@ func main() {
 	}
 	log.Printf("md broker adapter: %s", broker.Kind())
 
+	var rdb *redis.Client
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		opt, parseErr := redis.ParseURL(redisURL)
+		if parseErr != nil {
+			log.Printf("md: REDIS_URL invalid (%v); instrument cache will use Postgres + in-process TTL only", parseErr)
+		} else {
+			rdb = redis.NewClient(opt)
+			defer func() { _ = rdb.Close() }()
+		}
+	}
+
+	norm := normalize.New(pool, rdb, normalize.DefaultConfig())
+	runHooks := normalize.WrapWithNormalizer(&adapter.RunHooks{
+		OnNormalizedTick: func(context.Context, adapter.Tick) error {
+			return nil
+		},
+	}, norm)
+
 	go func() {
-		err := broker.Run(adapterCtx, nil)
+		err := broker.Run(adapterCtx, runHooks)
 		switch {
 		case err == nil:
 		case errors.Is(err, context.Canceled):
@@ -139,6 +159,9 @@ func main() {
 		}
 		if coord != nil && pool != nil {
 			h["replay_db"] = true
+		}
+		if rdb != nil {
+			h["redis_instrument_cache"] = true
 		}
 		_ = json.NewEncoder(w).Encode(h)
 	})
