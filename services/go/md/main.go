@@ -14,6 +14,7 @@ import (
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
+	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -115,8 +116,18 @@ func main() {
 	}
 
 	norm := normalize.New(pool, rdb, normalize.DefaultConfig())
+
+	var tickBatcher *persist.Batcher
+	if pool != nil {
+		tickBatcher = persist.NewBatcher(pool, persist.DefaultConfig())
+		go tickBatcher.Run(adapterCtx)
+	}
+
 	runHooks := normalize.WrapWithNormalizer(&adapter.RunHooks{
-		OnNormalizedTick: func(context.Context, adapter.Tick) error {
+		OnNormalizedTick: func(ctx context.Context, t adapter.Tick) error {
+			if tickBatcher != nil {
+				return tickBatcher.Enqueue(ctx, t)
+			}
 			return nil
 		},
 	}, norm)

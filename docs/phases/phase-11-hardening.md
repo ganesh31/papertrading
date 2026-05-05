@@ -11,6 +11,7 @@ Goal: turn the project into a credible portfolio artifact. Load + chaos tests, k
 ## Deliverables
 
 - [ ] Load test baseline: 10k orders/min sustained, burst 20k/min, p99 SLOs met.
+- [ ] Hot-path throughput numbers published (matching, MD, SPAN, MMs) with CPU/mem/GC profiles.
 - [ ] Chaos test suite covering 5 failure modes.
 - [ ] Kill switch implemented + runbook written.
 - [ ] Surveillance consumer: OTR alerts, position-limit alerts.
@@ -30,7 +31,11 @@ Goal: turn the project into a credible portfolio artifact. Load + chaos tests, k
   - `orders_steady.js` — 10k/min for 30 min, place + cancel mix (70/30).
   - `orders_burst.js` — ramp to 20k/min.
   - `md_firehose.js` — 20k ticks/sec into MD for 10 min.
-- Capture: p50/p95/p99 per endpoint, error rate, GC/event-loop metrics.
+- Capture (per run):
+  - Throughput: orders/sec, acks/sec, trades/sec; ticks/sec; SPAN calls/sec; MM quotes/sec.
+  - Latency: p50/p95/p99 per endpoint + key internal spans (match loop, SPAN calc, persist).
+  - Errors: error rate + top error codes.
+  - Resource: CPU/RSS, queue depths, consumer lag, GC pause (Go) / event-loop lag (Node).
 - Commit Grafana dashboard JSON `Load Test`.
 - Fix bottlenecks uncovered (common: DB connection pool; WS fan-out).
 - Publish numbers in `docs/performance.md`.
@@ -118,6 +123,11 @@ Structure:
 | MD tick-to-FE p99 | < 300 ms | ___ |
 | Recovery after ME crash | < 30 s | ___ |
 | Cold boot time | < 60 s | ___ |
+
+Also publish:
+
+- **Throughput**: orders/sec, trades/sec, ticks/sec (sustained + burst peak).
+- **Runtime health**: Go GC pause p99 (matching/MD/SPAN/MM), Node event-loop lag p99 (warm path).
 
 Publish the actual measured numbers in README.
 

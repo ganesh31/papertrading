@@ -17,15 +17,20 @@ Everything that cuts across phases. Set up in Phase 0 and kept healthy throughou
 | ------------------------------------- | --------- | ---------------------------------------- |
 | `order_ack_latency_ms{service}`       | histogram | Client perception; your interview number |
 | `order_reject_total{reason}`          | counter   | Surveillance + UX                        |
+| `orders_accepted_total{service}`      | counter   | Throughput baseline; load-test compars   |
+| `trades_total{service}`              | counter   | Fill-rate + throughput sanity            |
 | `order_to_trade_ratio{user}`          | gauge     | SEBI OTR compliance narrative            |
 | `match_engine_queue_depth{symbol}`    | gauge     | Hotspot detection                        |
 | `match_engine_event_loop_lag_ms`      | histogram | Single-writer health                     |
 | `bus_consumer_lag_ms{consumer,topic}` | gauge     | Stream health                            |
+| `md_ticks_in_total{service}`          | counter   | Tick ingest throughput                   |
+| `md_ticks_out_total{service}`         | counter   | Fan-out throughput sanity                |
 | `md_tick_staleness_sec{symbol}`       | gauge     | Feed health                              |
 | `db_query_duration_ms{query}`         | histogram | Slow-query detection                     |
 | `gc_pause_ms{service}`                | histogram | Go GC story                              |
 | `node_event_loop_lag_ms{service}`     | histogram | Node health                              |
 | `span_calc_duration_ms`               | histogram | Risk path latency                        |
+| `span_calc_total`                     | counter   | SPAN throughput under load               |
 | `positions_reconcile_diff_total`      | counter   | Projection drift alarm                   |
 
 
