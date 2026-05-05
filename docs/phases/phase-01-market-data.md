@@ -547,3 +547,8 @@ Use when the Angel app IP **must** stay constant but your laptop’s IP does not
 - `MD_ADAPTER` env var switches between `nse_replay` and `angel_live` with no code change (angel_live may return "not configured" — that's fine).
 - ADR-0005 and ADR-0019 merged.
 
+### Note on algo trading (out of Phase 1 scope)
+
+Strategy logic and paper execution (bid/ask fills, momentum signals, risk caps) are documented in
+[Phase 9 — Strategy Runtime & SDK](./phase-09-strategy-sdk.md).
+

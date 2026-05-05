@@ -237,3 +237,38 @@ const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 - [ ] `pt strategy run --name=sma --mode=live` places orders during market hours.
 - [ ] Strategy crash → supervisor restarts → resubscribes.
 - [ ] ADR-0015 merged.
+
+## Appendix — Angel paper algo-trading (price-only momentum)
+
+This appendix captures a concrete “first strategy” target for the Strategy SDK work: India equities,
+1-second cadence, price-only momentum, and **bid/ask** paper fills (no LLM training required).
+
+### Target setup
+
+- **Venue/broker**: Angel One SmartAPI for live **market data** WebSocket (orders can remain paper-only).
+- **Universe**: ~**10 liquid NSE cash** symbols while iterating.
+- **Cadence**: compute signals on **1s** bars (or 1s snapshots) derived from ticks/quotes.
+- **Signals**: **price-only momentum** on mid/LTP-derived series (no volume filter, no NLP).
+- **Paper execution**: **bid/ask** fills (top-of-book), not LTP fantasy fills.
+
+### Minimal prerequisites
+
+- Angel SmartAPI app credentials (API key/secret + login secrets incl. TOTP as applicable).
+- Confirm the market-data WS mode you use exposes **reliable best bid/ask** for your universe.
+- Instruments mapping (`tradingsymbol ↔ token`) kept fresh (Angel public scrip master).
+- Runtime that can stay connected during market hours (optional VPS for stable uptime).
+
+### Execution model (paper)
+
+- **Signals**: computed from **price paths only** (example: 1s returns over last \(N\) seconds on mid).
+- **Fills**:
+  - buy near **ask**
+  - sell near **bid**
+  - add **bps slippage** + optional **latencyMs** so fills aren’t “too perfect.”
+- **Guards**: reject trades when quotes look broken (crossed book, missing bid/ask, absurd spread).
+
+### Costs (rough)
+
+- **LLM training**: **not required**.
+- **API/data**: commonly low incremental cost for retail WS usage (verify current Angel policy).
+- **Infra**: optional VPS; storage stays small if you persist **1s summaries** rather than raw ticks.
