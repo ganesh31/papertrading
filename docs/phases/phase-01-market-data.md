@@ -207,7 +207,7 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 - [x] **1.7** Persistence: **`internal/persist`** batch **`md.ticks`** (500 rows or 100 ms, **`ON CONFLICT DO NOTHING`**); hypertable + compression (migration **003**); **continuous aggregates** **`md.cagg_ticks_{1m,5m,15m,1h,1d}`** + **`add_continuous_aggregate_policy`** (migration **004**).
 - [x] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
 - [x] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
-- [ ] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
+- [x] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
 - [ ] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
 - [ ] **1.12** Exit artifacts: **ADR-0005** + ADR-0019; **Grafana** “Market Data” panels (tick rate, staleness, `md_adapter_reconnects_total`); **`docs/talking-points/phase-01.md`**.
 - [ ] **Metrics** (as in [Metrics](#metrics)): wire `md_*` + `replay_*` counters/gauges so the dashboard is honest.
@@ -253,7 +253,7 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 - [x] **`p1-1-7` / §1.7** — **`persist.Batcher`** on **`RunHooks.OnNormalizedTick`**; **`004_md_ticks_caggs.sql`**: CAGGs from **`md.ticks`** + refresh policies (1m/5m/15m **1 min** schedule, **1h** hourly, **1d** hourly).
 - [x] **`p1-1-8` / §1.8** — **`/stream`** on `md` (subscribe JSON); gateway WebSocket proxy; per-client ring buffer, drop-oldest, metric.
 - [x] **`p1-1-9` / §1.9** — Redis Streams **`ticks.v1`** (~1 h retention); consumer groups **`mm`**, **`strategy`**, **`surveillance`** (documented).
-- [ ] **`p1-1-10` / §1.10** — Gateway **`GET /instruments`**, **`GET /candles`**, **`GET /market/status`**, **`GET /replay/status`** (pass-through to `md`).
+- [x] **`p1-1-10` / §1.10** — Gateway **`GET /instruments`**, **`GET /candles`**, **`GET /market/status`**, **`GET /replay/status`** (pass-through to `md`).
 
 <a id="p1-tracker-c"></a>
 
@@ -390,10 +390,12 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 
 ### 1.10 Gateway REST
 
-- `GET /instruments?exchange=NSE&query=RELI`
-- `GET /candles?instrument_id=...&interval=1m&from=...&to=...`
-- `GET /market/status` — PREOPEN / OPEN / CLOSED / POSTCLOSE from IST clock.
-- `GET /replay/status` — pass-through to `md`'s control channel.
+Implemented on **`md`**; **`gateway`** proxies with **`fetch`** (env **`MD_BASE_URL`**, default `http://md:6011` in Compose).
+
+- `GET /instruments?exchange=NSE&query=RELI` — `ref.instruments` lookup (`exchange` defaults to **NSE**, **ILIKE** on `tradingsymbol`, max **200** rows).
+- `GET /candles?instrument_id=...&interval=1m&from=...&to=...` — reads Timescale continuous aggregates **`md.cagg_ticks_*`** (`interval`: **1m|5m|15m|1h|1d**); **`from`/`to`** RFC3339; optional **`limit`** (default **5000**, max **20000**).
+- `GET /market/status` — **`segment`** `NSE_EQ`, **`session`** from coarse IST clock (**weekends CLOSED**; holidays deferred to §1.11). Includes **`weekday`** (e.g. Saturday) so **`CLOSED`** on weekends is obvious.
+- `GET /replay/status` — pass-through to `md` replay coordinator (404 if replay not mounted).
 
 ### 1.11 Market hours logic
 

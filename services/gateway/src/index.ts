@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import client from "prom-client";
 import websocket from "@fastify/websocket";
 import { WebSocket } from "ws";
@@ -17,6 +17,35 @@ const helloCounter = new client.Counter({
 
 const app = Fastify({ logger: true });
 await app.register(websocket);
+
+function mdOrigin(): string {
+  return mdBaseUrl.replace(/\/$/, "");
+}
+
+/** Pass-through GET to md (Phase 1 REST). */
+async function proxyMdGet(req: FastifyRequest, reply: FastifyReply, mdPath: string) {
+  const incoming = new URL(req.url, "http://127.0.0.1");
+  const target = new URL(mdPath + incoming.search, `${mdOrigin()}/`);
+  try {
+    const res = await fetch(target);
+    reply.code(res.status);
+    const ct = res.headers.get("content-type");
+    if (ct) reply.header("content-type", ct);
+    const buf = Buffer.from(await res.arrayBuffer());
+    return reply.send(buf);
+  } catch (err) {
+    app.log.warn({ err }, "md proxy fetch failed");
+    return reply.code(502).send({ error: "md unreachable" });
+  }
+}
+
+app.get("/instruments", async (req, reply) => proxyMdGet(req, reply, "/instruments"));
+
+app.get("/candles", async (req, reply) => proxyMdGet(req, reply, "/candles"));
+
+app.get("/market/status", async (req, reply) => proxyMdGet(req, reply, "/market/status"));
+
+app.get("/replay/status", async (req, reply) => proxyMdGet(req, reply, "/replay/status"));
 
 app.get("/healthz", async () => {
   helloCounter.inc();

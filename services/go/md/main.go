@@ -17,6 +17,7 @@ import (
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
+	"github.com/ganesh/papertrading/services/go/md/internal/rest"
 	"github.com/ganesh/papertrading/services/go/md/internal/stream"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -196,6 +197,8 @@ func main() {
 	if coord != nil {
 		coord.RegisterHTTP(mux)
 	}
+
+	rest.Register(mux, pool)
 
 	mux.HandleFunc("GET /stream", hub.HandleStream)
 
