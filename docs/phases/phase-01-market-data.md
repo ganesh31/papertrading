@@ -172,7 +172,7 @@ What happens under the hood:
 
 1. `md` service reads `md.bars_1m` rows for `(date, symbols)`.
 2. For each bar, the **tick synthesizer** emits N (default 10) ticks spanning the bar's timestamp to `timestamp + 60s`.
-3. Each tick is fed through the normalizer → published to `ticks.v1` → persisted to `md.ticks` → fanned out to WS subscribers.
+3. Each tick is fed through the normalizer → fanned out to WS **`/stream`** subscribers → **`XADD`** to Redis Streams **`ticks.v1`** → persisted to **`md.ticks`** (batched).
 4. The **virtual clock** sleeps between ticks such that `wall_elapsed = virtual_elapsed / speed`. At `speed=100`, one trading day (~6.5 hours) replays in ~4 minutes.
 5. Exits when the last bar of the date is processed.
 
@@ -205,8 +205,8 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 - [x] **1.5** `angel_live`: **stub only** — interface satisfier, `ErrNotConfigured` unless `MD_ADAPTER=angel_live` (full WS/auth Phase 11).
 - [x] **1.6** Normalizer: `DraftTick` → canonical **`adapter.Tick`** (`bid_px`/`ask_px` pointers, `oi` zero for equity); **60 s staleness** vs wall clock for **`LIVE` only** (replay uses historical timestamps); **Redis + in-process** instrument cache **24 h TTL** (`md:inst:v1:{instrument_id}` JSON, Postgres on miss); `source = REPLAY | LIVE`; **`RunHooks.OnNormalizedTick`** (persist/bus §1.7+).
 - [x] **1.7** Persistence: **`internal/persist`** batch **`md.ticks`** (500 rows or 100 ms, **`ON CONFLICT DO NOTHING`**); hypertable + compression (migration **003**); **continuous aggregates** **`md.cagg_ticks_{1m,5m,15m,1h,1d}`** + **`add_continuous_aggregate_policy`** (migration **004**).
-- [ ] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
-- [ ] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
+- [x] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
+- [x] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
 - [ ] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
 - [ ] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
 - [ ] **1.12** Exit artifacts: **ADR-0005** + ADR-0019; **Grafana** “Market Data” panels (tick rate, staleness, `md_adapter_reconnects_total`); **`docs/talking-points/phase-01.md`**.
@@ -251,8 +251,8 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 
 - [x] **`p1-1-6` / §1.6** — `internal/normalize`: adapter **`DraftTick`** → **`Tick`**; **LIVE-only** staleness (60 s vs `time.Now()`); **`REDIS_URL`** optional (`redis://…`); Redis key **`md:inst:v1:{id}`** + **24 h** in-process TTL; **`WrapWithNormalizer`** chains **`OnNormalizedTick`**; Compose **`md`** sets **`REDIS_URL`** to **`redis`**.
 - [x] **`p1-1-7` / §1.7** — **`persist.Batcher`** on **`RunHooks.OnNormalizedTick`**; **`004_md_ticks_caggs.sql`**: CAGGs from **`md.ticks`** + refresh policies (1m/5m/15m **1 min** schedule, **1h** hourly, **1d** hourly).
-- [ ] **`p1-1-8` / §1.8** — **`/stream`** on `md` (subscribe JSON); gateway WebSocket proxy; per-client ring buffer, drop-oldest, metric.
-- [ ] **`p1-1-9` / §1.9** — Redis Streams **`ticks.v1`** (~1 h retention); consumer groups **`mm`**, **`strategy`**, **`surveillance`** (documented).
+- [x] **`p1-1-8` / §1.8** — **`/stream`** on `md` (subscribe JSON); gateway WebSocket proxy; per-client ring buffer, drop-oldest, metric.
+- [x] **`p1-1-9` / §1.9** — Redis Streams **`ticks.v1`** (~1 h retention); consumer groups **`mm`**, **`strategy`**, **`surveillance`** (documented).
 - [ ] **`p1-1-10` / §1.10** — Gateway **`GET /instruments`**, **`GET /candles`**, **`GET /market/status`**, **`GET /replay/status`** (pass-through to `md`).
 
 <a id="p1-tracker-c"></a>
@@ -384,8 +384,9 @@ Stub it as a Go interface satisfier that returns `ErrNotConfigured` unless `MD_A
 
 ### 1.9 Bus publishing
 
-- Stream name: `ticks.v1`. One message per tick. Retention ~1h (ticks are a firehose; Postgres is the durable store).
-- Consumer groups: `mm`, `strategy`, `surveillance`.
+- Stream name: **`ticks.v1`** (env **`MD_TICKS_STREAM`**). One **`XADD`** per normalized tick; field **`payload`** holds JSON (same shape as WS tick wire).
+- Approximate **`MINID`** trim on each add keeps roughly **one hour** of entries (env **`MD_TICKS_STREAM_RETENTION_SEC`**, default 3600). Postgres **`md.ticks`** stays authoritative.
+- Consumer groups **`mm`**, **`strategy`**, **`surveillance`** — create with Redis **`XGROUP CREATE`** (see [`infra/runbooks/redis-ticks-v1.md`](../../infra/runbooks/redis-ticks-v1.md)).
 
 ### 1.10 Gateway REST
 
@@ -455,6 +456,9 @@ create table md.bhav_eq (
 - `md_tick_staleness_seconds{symbol}`
 - `md_adapter_reconnects_total{adapter}` (only meaningful for `angel_live`)
 - `md_ws_clients_gauge`
+- `md_ws_dropped_ticks_total{reason}`
+- `md_ticks_stream_published_total`
+- `md_ticks_stream_publish_errors_total`
 - `md_candle_build_lag_ms`
 - `md_persist_batch_size`
 - `replay_virtual_time_gauge`

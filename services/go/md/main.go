@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
+	"github.com/ganesh/papertrading/services/go/md/internal/bus"
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
@@ -120,6 +121,11 @@ func main() {
 
 	hub := stream.New(pool, stream.DefaultConfig())
 
+	var tickPub *bus.TicksPublisher
+	if rdb != nil {
+		tickPub = bus.NewTicksPublisher(rdb, bus.ConfigFromEnv(bus.DefaultTicksPublisherConfig()))
+	}
+
 	var tickBatcher *persist.Batcher
 	if pool != nil {
 		tickBatcher = persist.NewBatcher(pool, persist.DefaultConfig())
@@ -129,6 +135,9 @@ func main() {
 	runHooks := normalize.WrapWithNormalizer(&adapter.RunHooks{
 		OnNormalizedTick: func(ctx context.Context, t adapter.Tick) error {
 			hub.Publish(t)
+			if tickPub != nil {
+				_ = tickPub.Publish(ctx, t)
+			}
 			if tickBatcher != nil {
 				return tickBatcher.Enqueue(ctx, t)
 			}
@@ -177,6 +186,9 @@ func main() {
 		}
 		if rdb != nil {
 			h["redis_instrument_cache"] = true
+		}
+		if tickPub != nil {
+			h["redis_ticks_stream"] = tickPub.StreamName()
 		}
 		_ = json.NewEncoder(w).Encode(h)
 	})
