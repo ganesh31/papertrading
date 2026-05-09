@@ -6,6 +6,8 @@ import "time"
 type Config struct {
 	LiveStaleness time.Duration // wall clock vs tick ts for LIVE only; default 60s
 	InstrumentTTL time.Duration // Redis + in-process cache; default 24h
+	// AdapterKind is the active md broker adapter (Prometheus "adapter" label); empty → "unknown".
+	AdapterKind string
 }
 
 func (c Config) resolved() Config {
@@ -15,6 +17,9 @@ func (c Config) resolved() Config {
 	}
 	if out.InstrumentTTL <= 0 {
 		out.InstrumentTTL = 24 * time.Hour
+	}
+	if out.AdapterKind == "" {
+		out.AdapterKind = "unknown"
 	}
 	return out
 }

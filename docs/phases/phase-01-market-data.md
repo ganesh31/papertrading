@@ -209,8 +209,8 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 - [x] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
 - [x] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
 - [x] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
-- [ ] **1.12** Exit artifacts: **ADR-0005** + ADR-0019; **Grafana** “Market Data” panels (tick rate, staleness, `md_adapter_reconnects_total`); **`docs/talking-points/phase-01.md`**.
-- [ ] **Metrics** (as in [Metrics](#metrics)): wire `md_*` + `replay_*` counters/gauges so the dashboard is honest.
+- [x] **1.12** Exit artifacts: **ADR-0005** + ADR-0019 (both Accepted); **Grafana** dashboard **`Market Data (md)`** (`infra/grafana/dashboards/market-data-md.json`); **`docs/talking-points/phase-01.md`**.
+- [x] **Metrics** (as in [Metrics](#metrics)): core `md_*` + `replay_*` counters/gauges wired on **`md`** `/metrics` (see Grafana dashboard).
 
 ### Implementation tracker (repo sync)
 
@@ -265,8 +265,8 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 
 ### Implementation tracker — D. Exit & quality (§1.12 + metrics + testing)
 
-- [ ] **`p1-1-12` / §1.12** — Grafana **Market Data** dashboard; **`docs/talking-points/phase-01.md`**; link from `docs/talking-points/README.md`.
-- [ ] **`p1-metrics`** — Wire counters/gauges from [Metrics](#metrics) (`md_*`, `replay_*`) so Grafana matches reality.
+- [x] **`p1-1-12` / §1.12** — Grafana **Market Data (md)** dashboard (`infra/grafana/dashboards/market-data-md.json`); **`docs/talking-points/phase-01.md`** (indexed in `docs/talking-points/README.md`).
+- [x] **`p1-metrics`** — Wired counters/gauges on **`md`** `/metrics` (see [Metrics](#metrics)); **`infra/grafana/provisioning/datasources/datasources.yml`** sets Prometheus **`uid: prometheus`** for dashboard portability.
 - [ ] **`p1-test-integ`** — [Testing](#testing): Testcontainers + seeded bars → replay; byte-identical tick log; candle / property checks where applicable.
 
 ### 1.1 Contract master ingestion
@@ -407,8 +407,8 @@ Implemented on **`md`**; **`gateway`** proxies with **`fetch`** (env **`MD_BASE_
 
 ### 1.12 Grafana + talking points (ship with the phase)
 
-- Provision a **Market Data** Grafana dashboard: tick rate, tick staleness, `md_adapter_reconnects_total` (meaningful once `angel_live` runs), WS client gauge if exposed.
-- Add **`docs/talking-points/phase-01.md`** (listed in [Deliverables](#deliverables)); link from [talking-points/README.md](../talking-points/README.md).
+- Provisioned: **`infra/grafana/dashboards/market-data-md.json`** (Compose mounts under Grafana provisioning). Panels cover ingest rate, Redis stream publish rate, WS clients/drops, persist batch p95, LIVE staleness histogram (empty in replay-only), **`md_adapter_reconnects_total`** (Phase 11), and replay gauges.
+- **`docs/talking-points/phase-01.md`** linked from [talking-points/README.md](../talking-points/README.md).
 
 ## `just` / CLI cheat sheet
 
@@ -454,18 +454,23 @@ create table md.bhav_eq (
 
 ## Metrics
 
-- `md_ticks_ingested_total{adapter, symbol}`
-- `md_tick_staleness_seconds{symbol}`
-- `md_adapter_reconnects_total{adapter}` (only meaningful for `angel_live`)
+Implemented on **`md`** **`GET /metrics`** unless noted.
+
+- `md_ticks_ingested_total{adapter}` — after normalization (label = **`MD_ADAPTER`** kind).
+- `md_ticks_stale_dropped_total{adapter}` — LIVE ticks dropped by staleness gate.
+- `md_tick_staleness_seconds{adapter}` — histogram of wall − tick time for LIVE ticks accepted.
+- `md_adapter_reconnects_total{adapter}` — meaningful once **`angel_live`** reconnects (Phase 11).
 - `md_ws_clients_gauge`
 - `md_ws_dropped_ticks_total{reason}`
 - `md_ticks_stream_published_total`
 - `md_ticks_stream_publish_errors_total`
-- `md_candle_build_lag_ms`
-- `md_persist_batch_size`
-- `replay_virtual_time_gauge`
-- `replay_speed_gauge`
-- `replay_bars_remaining_gauge`
+- `md_candle_build_lag_ms` — **not implemented** (CAGG refresh is Timescale policy–driven).
+- `md_persist_batch_size` — histogram of rows per Postgres flush batch.
+- `replay_running` — **1** during **`nse_replay`** emission.
+- `replay_virtual_timestamp_seconds` — Unix seconds for last emitted replay tick (**0** idle).
+- `replay_speed_multiplier` — configured replay speed while running (**0** idle).
+- `replay_pending_ticks` — synthetic ticks not yet emitted in current run.
+- `replay_session_bar_rows` — **`md.bars_1m`** rows loaded for the session (**0** idle).
 
 ## Performance targets
 

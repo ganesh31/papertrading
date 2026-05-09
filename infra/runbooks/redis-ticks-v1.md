@@ -31,6 +31,7 @@ Prometheus (on `md` `/metrics`):
 
 - `md_ticks_stream_published_total`
 - `md_ticks_stream_publish_errors_total`
+- `md_ticks_ingested_total`, `md_ws_*`, `replay_*`, etc. — see **Market Data (md)** Grafana dashboard (`infra/grafana/dashboards/market-data-md.json`).
 
 ## Env (`md`)
 

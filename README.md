@@ -21,7 +21,7 @@ Quickstart:
 - `curl -sf http://localhost:4000/healthz`
 - `curl -sf http://localhost:6011/healthz` (expect `broker_adapter`, optional `replay_db`, `redis_instrument_cache` when DB/Redis are wired)
 - `curl -sf http://localhost:4000/metrics | rg hello_requests_total`
-- `curl -sf http://localhost:6011/metrics | rg hello_requests_total`
+- `curl -sf http://localhost:6011/metrics | rg md_ticks_ingested_total` (idle **`0`** until replay/live emits ticks)
 
 ### Observability
 

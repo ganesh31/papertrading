@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
+	"github.com/ganesh/papertrading/services/go/md/internal/mdmetrics"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -104,12 +105,13 @@ func (b *Batcher) insertPostgres(ctx context.Context, rows []adapter.Tick) error
 		batch.Queue(insertTickSQL, args...)
 	}
 	br := b.pool.SendBatch(ctx, batch)
-	defer br.Close()
 	for i := 0; i < batch.Len(); i++ {
 		if _, err := br.Exec(); err != nil {
+			_ = br.Close()
 			return fmt.Errorf("md persist: batch exec row %d: %w", i, err)
 		}
 	}
+	mdmetrics.PersistBatchSize.Observe(float64(len(rows)))
 	return br.Close()
 }
 

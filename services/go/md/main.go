@@ -16,6 +16,7 @@ import (
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
 	"github.com/ganesh/papertrading/services/go/md/internal/bus"
 	"github.com/ganesh/papertrading/services/go/md/internal/marketstatus"
+	"github.com/ganesh/papertrading/services/go/md/internal/mdmetrics"
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
@@ -23,7 +24,6 @@ import (
 	"github.com/ganesh/papertrading/services/go/md/internal/stream"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -108,6 +108,7 @@ func main() {
 		log.Fatalf("broker adapter: %v", err)
 	}
 	log.Printf("md broker adapter: %s", broker.Kind())
+	brokerKind := string(broker.Kind())
 
 	var rdb *redis.Client
 	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
@@ -122,7 +123,9 @@ func main() {
 
 	holidayCal := loadHolidayCalendar()
 
-	norm := normalize.New(pool, rdb, normalize.DefaultConfig())
+	nrmCfg := normalize.DefaultConfig()
+	nrmCfg.AdapterKind = string(kind)
+	norm := normalize.New(pool, rdb, nrmCfg)
 
 	hub := stream.New(pool, stream.DefaultConfig())
 
@@ -139,6 +142,7 @@ func main() {
 
 	runHooks := normalize.WrapWithNormalizer(&adapter.RunHooks{
 		OnNormalizedTick: func(ctx context.Context, t adapter.Tick) error {
+			mdmetrics.TicksIngested.WithLabelValues(brokerKind).Inc()
 			hub.Publish(t)
 			if tickPub != nil {
 				_ = tickPub.Publish(ctx, t)
@@ -169,17 +173,9 @@ func main() {
 		}
 	}
 
-	helloCounter := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "hello_requests_total",
-		Help: "Count of hello-world requests",
-	})
-	prometheus.MustRegister(helloCounter)
-
-	brokerKind := string(broker.Kind())
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		helloCounter.Inc()
 		w.Header().Set("Content-Type", "application/json")
 		h := map[string]any{
 			"ok":             true,

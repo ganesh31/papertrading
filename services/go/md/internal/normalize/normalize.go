@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
+	"github.com/ganesh/papertrading/services/go/md/internal/mdmetrics"
 )
 
 // Normalize maps a draft tick to a canonical Tick, optionally dropping stale LIVE ticks.
@@ -17,13 +18,22 @@ func (n *Normalizer) Normalize(ctx context.Context, d adapter.DraftTick, now tim
 	}
 	src := canonicalSource(d.Source)
 	if staleLive(src, d.Ts, now, cfg.LiveStaleness) {
+		if src == "LIVE" {
+			mdmetrics.TicksStaleDropped.WithLabelValues(cfg.AdapterKind).Inc()
+		}
 		return adapter.Tick{}, true, nil
 	}
 	if n == nil || n.pool == nil {
+		if src == "LIVE" {
+			mdmetrics.TickStalenessSeconds.WithLabelValues(cfg.AdapterKind).Observe(now.Sub(d.Ts).Seconds())
+		}
 		return buildTick(d, src), false, nil
 	}
 	if _, err := n.loadInstrument(ctx, d.InstrumentID); err != nil {
 		return adapter.Tick{}, false, err
+	}
+	if src == "LIVE" {
+		mdmetrics.TickStalenessSeconds.WithLabelValues(cfg.AdapterKind).Observe(now.Sub(d.Ts).Seconds())
 	}
 	return buildTick(d, src), false, nil
 }

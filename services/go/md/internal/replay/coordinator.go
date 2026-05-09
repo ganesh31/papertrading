@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ganesh/papertrading/services/go/md/internal/mdmetrics"
 	"github.com/ganesh/papertrading/services/go/md/internal/ticksynth"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -210,6 +211,19 @@ func (c *Coordinator) runReplay(ctx context.Context, req Request) error {
 		return q[i].iid < q[j].iid
 	})
 
+	totalTicks := len(q)
+	defer func() {
+		mdmetrics.ReplayRunning.Set(0)
+		mdmetrics.ReplaySpeedMultiplier.Set(0)
+		mdmetrics.ReplayPendingTicks.Set(0)
+		mdmetrics.ReplayVirtualTimestampSeconds.Set(0)
+		mdmetrics.ReplaySessionBarRows.Set(0)
+	}()
+	mdmetrics.ReplayRunning.Set(1)
+	mdmetrics.ReplaySpeedMultiplier.Set(req.Speed)
+	mdmetrics.ReplaySessionBarRows.Set(float64(len(bars)))
+	mdmetrics.ReplayPendingTicks.Set(float64(totalTicks))
+
 	realStart := time.Now()
 	virtualAnchor := q[0].ts
 
@@ -240,6 +254,8 @@ func (c *Coordinator) runReplay(ctx context.Context, req Request) error {
 			return err
 		}
 		n++
+		mdmetrics.ReplayVirtualTimestampSeconds.Set(float64(item.ts.UnixNano()) / 1e9)
+		mdmetrics.ReplayPendingTicks.Set(float64(totalTicks - int(n)))
 		c.statusMu.Lock()
 		st := c.status
 		st.VirtualTime = item.ts

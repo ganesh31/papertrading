@@ -52,7 +52,8 @@ Goal: a one-command dev environment, CI green on an empty app, observability wir
 
 - `services/gateway`: Fastify, `/healthz`, `/metrics` (Prometheus), OTel instrumentation via `@opentelemetry/auto-instrumentations-node`.
 - `services/go/md`: **`net/http`** (stdlib), `/healthz`, `/metrics`, OTel via `go.opentelemetry.io/otel`.
-- Both emit one business metric: `hello_requests_total`.
+- **`gateway`**: bumps **`hello_requests_total`** on **`/healthz`** (Phase 0 smoke).
+- **`md`**: Phase 1 **`md_*` / `replay_*`** metrics (e.g. **`md_ticks_ingested_total`** once replay/live emits ticks).
 
 ### 0.5 CI
 
@@ -67,10 +68,10 @@ Configure branch protection on GitHub so **`ci`** is a required status check on 
 ### 0.6 Observability verification
 
 - Spin everything up (`make up`), hit `/healthz` on both services **100 times**.
-- **Prometheus** scrape targets for `gateway` + `md` are **up** (`http://localhost:9090/api/v1/targets` — jobs scrape `/metrics`; counters include `hello_requests_total`).
+- **Prometheus** scrape targets for `gateway` + `md` are **up** (`http://localhost:9090/api/v1/targets` — jobs scrape `/metrics`; **`gateway`** exposes **`hello_requests_total`**; **`md`** exposes **`md_*`** / **`replay_*`**).
 - Grafana Explore → **Loki**: `{container=~".*gateway.*"}` returns logs once gateway runs **as a Docker service** (see root `README.md`).
 - Grafana Explore → **Tempo**: after `/healthz` hits, traces appear for `gateway` + `md` (service names from `OTEL_SERVICE_NAME`).
-- Optional polish: provision a Grafana dashboard JSON named **Trading Overview** for `hello_requests_total`; screenshot into this doc.
+- Optional polish: provision **Trading Overview** for **`hello_requests_total`**; Phase 1 ships **`Market Data (md)`** (`infra/grafana/dashboards/market-data-md.json`) for **`md`** metrics.
 
 ### 0.7 ADRs written
 
