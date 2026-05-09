@@ -1,0 +1,17 @@
+{
+  "_note": "IST calendar dates when NSE equity cash is closed. Refresh yearly from the official NSE holiday list.",
+  "nse_eq": [
+    "2026-01-26",
+    "2026-02-16",
+    "2026-03-25",
+    "2026-04-03",
+    "2026-04-14",
+    "2026-05-01",
+    "2026-07-21",
+    "2026-08-15",
+    "2026-10-02",
+    "2026-11-09",
+    "2026-11-24",
+    "2026-12-25"
+  ]
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,35 +18,56 @@ import (
 
 var instrumentIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
-// Register mounts Phase 1 REST handlers that require Postgres (pool non-nil).
-func Register(mux *http.ServeMux, pool *pgxpool.Pool) {
+// Register mounts Phase 1 REST handlers. cal may be nil (weekends only, no holiday file).
+func Register(mux *http.ServeMux, pool *pgxpool.Pool, cal *marketstatus.Calendar) {
 	mux.HandleFunc("GET /instruments", func(w http.ResponseWriter, r *http.Request) {
 		handleInstruments(w, r, pool)
 	})
 	mux.HandleFunc("GET /candles", func(w http.ResponseWriter, r *http.Request) {
 		handleCandles(w, r, pool)
 	})
-	mux.HandleFunc("GET /market/status", handleMarketStatus)
+	mux.HandleFunc("GET /market/status", func(w http.ResponseWriter, r *http.Request) {
+		handleMarketStatus(w, r, cal)
+	})
 }
 
-func handleMarketStatus(w http.ResponseWriter, r *http.Request) {
+func handleMarketStatus(w http.ResponseWriter, r *http.Request, cal *marketstatus.Calendar) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	now := time.Now()
+	vsRaw := strings.TrimSpace(r.URL.Query().Get("virtualTime"))
+	if vsRaw != "" {
+		parsed, err := parseVirtualTime(vsRaw)
+		if err != nil {
+			jsonErr(w, http.StatusBadRequest, "invalid virtualTime (RFC3339; use Zulu or encode + as %2B)")
+			return
+		}
+		now = parsed
+	}
+
 	loc := marketstatus.ISTLocation()
 	local := now.In(loc)
-	session := marketstatus.NSEEQSession(now)
+	session := marketstatus.NSEEQSession(now, cal)
 	asOf := local.Format(time.RFC3339Nano)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	resp := map[string]string{
 		"segment": "NSE_EQ",
 		"session": session,
 		"asOf":    asOf,
 		"weekday": local.Weekday().String(),
-	})
+	}
+	if vsRaw != "" {
+		resp["clock"] = "virtual"
+	} else {
+		resp["clock"] = "wall"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("market/status encode: %v", err)
+	}
 }
 
 func handleInstruments(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {

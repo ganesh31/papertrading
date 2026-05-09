@@ -24,8 +24,11 @@ function mdOrigin(): string {
 
 /** Pass-through GET to md (Phase 1 REST). */
 async function proxyMdGet(req: FastifyRequest, reply: FastifyReply, mdPath: string) {
-  const incoming = new URL(req.url, "http://127.0.0.1");
-  const target = new URL(mdPath + incoming.search, `${mdOrigin()}/`);
+  // Prefer Node raw URL (path + query); Fastify's req.url can omit search params on some routes.
+  const pathAndQuery = typeof req.raw.url === "string" ? req.raw.url : req.url;
+  const incoming = new URL(pathAndQuery, "http://127.0.0.1");
+  const search = incoming.search || "";
+  const target = new URL(mdPath + search, `${mdOrigin()}/`);
   try {
     const res = await fetch(target);
     reply.code(res.status);

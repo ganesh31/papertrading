@@ -19,6 +19,13 @@ data-fetch-bhavcopy from='2026-04-10' to='2026-04-20':
 
 data-refresh-all: data-fetch-minute data-fetch-bhavcopy
 
+# Virtual-clock replay (requires md up with MD_ADAPTER=nse_replay).
+replay date='2026-04-24' symbols='INFY,RELIANCE' speed='100':
+	go run ./cmd/pt replay --date '{{date}}' --symbols '{{symbols}}' --speed '{{speed}}'
+
+replay-stop:
+	go run ./cmd/pt replay stop
+
 up:
   make up
 

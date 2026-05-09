@@ -32,6 +32,8 @@ importers:
         specifier: ^2.9.6
         version: 2.9.6
 
+  packages/config: {}
+
   services/gateway:
     dependencies:
       '@fastify/websocket':

@@ -10,6 +10,10 @@ RUN CGO_ENABLED=0 go build -o /out/md .
 
 FROM alpine:3.20
 RUN adduser -D -u 10001 app
+
+COPY infra/seed/holidays.json /etc/papertrading/holidays.json
+RUN chown app:app /etc/papertrading/holidays.json
+
 USER app
 
 COPY --from=build /out/md /usr/local/bin/md

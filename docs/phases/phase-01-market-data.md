@@ -208,7 +208,7 @@ Track these in order; **NFO / F&O bhavcopy, true `angel_live`, and option-chain 
 - [x] **1.8** WS **`/stream`** on `md`, subscribe message shape, gateway proxy, per-client ring buffer + drop-oldest + metric.
 - [x] **1.9** Bus **`ticks.v1`** on Redis Streams (or chosen bus): ~1 h retention; document consumer labels (`mm`, `strategy`, `surveillance`).
 - [x] **1.10** Gateway REST: `GET /instruments`, `GET /candles`, `GET /market/status`, **`GET /replay/status`** pass-through.
-- [ ] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
+- [x] **1.11** **`pt replay`** CLI + **`packages/config/market-hours.ts`**: `holidays.json`, **NSE_EQ** session enum, virtual-clock “now” in replay mode.
 - [ ] **1.12** Exit artifacts: **ADR-0005** + ADR-0019; **Grafana** “Market Data” panels (tick rate, staleness, `md_adapter_reconnects_total`); **`docs/talking-points/phase-01.md`**.
 - [ ] **Metrics** (as in [Metrics](#metrics)): wire `md_*` + `replay_*` counters/gauges so the dashboard is honest.
 
@@ -259,7 +259,7 @@ Use this block as a **second navigation layer**: each `###` below is its own “
 
 ### Implementation tracker — C. CLI & calendars (§1.11)
 
-- [ ] **`p1-1-11` / §1.11** — **`pt replay`** (+ `replay-stop`); **`packages/config/market-hours.ts`**; **`infra/seed/holidays.json`**; **NSE_EQ** session enum; replay “now” = virtual clock.
+- [x] **`p1-1-11` / §1.11** — **`pt replay`** (+ `replay-stop`); **`packages/config/market-hours.ts`**; **`infra/seed/holidays.json`**; **NSE_EQ** session enum; replay “now” = virtual clock.
 
 <a id="p1-tracker-d"></a>
 
@@ -394,16 +394,16 @@ Implemented on **`md`**; **`gateway`** proxies with **`fetch`** (env **`MD_BASE_
 
 - `GET /instruments?exchange=NSE&query=RELI` — `ref.instruments` lookup (`exchange` defaults to **NSE**, **ILIKE** on `tradingsymbol`, max **200** rows).
 - `GET /candles?instrument_id=...&interval=1m&from=...&to=...` — reads Timescale continuous aggregates **`md.cagg_ticks_*`** (`interval`: **1m|5m|15m|1h|1d**); **`from`/`to`** RFC3339; optional **`limit`** (default **5000**, max **20000**).
-- `GET /market/status` — **`segment`** `NSE_EQ`, **`session`** from coarse IST clock (**weekends CLOSED**; holidays deferred to §1.11). Includes **`weekday`** (e.g. Saturday) so **`CLOSED`** on weekends is obvious.
+- `GET /market/status` — **`segment`** `NSE_EQ`, **`session`** from IST clock + **`infra/seed/holidays.json`** (via **`MARKET_HOLIDAYS_PATH`** / Docker **`/etc/papertrading/holidays.json`**). Optional **`virtualTime`** (RFC3339) for replay UI (**`clock`: `virtual`|`wall`**). **`weekday`** explains weekend **`CLOSED`**.
 - `GET /replay/status` — pass-through to `md` replay coordinator (404 if replay not mounted).
 
-### 1.11 Market hours logic
+### 1.11 Market hours logic + `pt replay`
 
-- `packages/config/market-hours.ts`.
-- Reads `infra/seed/holidays.json` (annual refresh).
-- Per-segment sessions: implement **NSE_EQ** for Phase 1. **NFO / CDS** calendar hooks — add when those segments are in scope (NFO plug-in).
-- `getSession(now, segment) -> 'PREOPEN' | 'OPEN' | 'CLOSED' | 'POSTCLOSE'`.
-- In **replay mode**, `now` is the virtual clock's time — so market hours logic "just works" against replayed sessions.
+- **`infra/seed/holidays.json`**: `{ "nse_eq": ["YYYY-MM-DD", ...] }` — refresh yearly from NSE; **`md`** loads first existing path among **`MARKET_HOLIDAYS_PATH`**, **`/etc/papertrading/holidays.json`** (Docker image), **`infra/seed/holidays.json`** (cwd).
+- **`packages/config/market-hours.ts`** (**`@papertrading/config`**): **`parseNseEqHolidays`**, **`getSession(now, segment, holidays)`** — same bands as Go **`internal/marketstatus`** (**NSE_EQ** only for Phase 1).
+- **`pt replay`**: **`go run ./cmd/pt replay --date=YYYY-MM-DD --symbols=INFY,RELIANCE [--speed=100] [--ticks-per-bar=10] [...]`** → **`POST $MD_URL/replay/start`** (default **`MD_URL=http://localhost:6011`**). **`pt replay stop`** → **`POST .../replay/stop`**. **`just replay`** / **`just replay-stop`** wrap the same.
+- **Replay virtual clock**: **`GET /market/status?virtualTime=<RFC3339>`** evaluates session at replay time; UI feeds **`virtualTime`** from **`GET /replay/status`** when **`running`**.
+- **NFO / CDS** calendars — defer to NFO plug-in.
 
 ### 1.12 Grafana + talking points (ship with the phase)
 

@@ -14,9 +14,12 @@ func ISTLocation() *time.Location {
 }
 
 // NSEEQSession returns PREOPEN / OPEN / POSTCLOSE / CLOSED for NSE equity cash.
-// Weekends are CLOSED. Holidays are not loaded until Phase 1.11 (market-hours package).
-func NSEEQSession(now time.Time) string {
+// Weekends are CLOSED. When cal is non-nil, configured nse_eq holidays (IST dates) are CLOSED.
+func NSEEQSession(now time.Time, cal *Calendar) string {
 	t := now.In(ISTLocation())
+	if cal != nil && cal.IsNSEEQHoliday(now) {
+		return "CLOSED"
+	}
 	wd := t.Weekday()
 	if wd == time.Saturday || wd == time.Sunday {
 		return "CLOSED"

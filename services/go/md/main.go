@@ -9,11 +9,13 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ganesh/papertrading/services/go/md/internal/adapter"
 	"github.com/ganesh/papertrading/services/go/md/internal/bus"
+	"github.com/ganesh/papertrading/services/go/md/internal/marketstatus"
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
@@ -118,6 +120,8 @@ func main() {
 		}
 	}
 
+	holidayCal := loadHolidayCalendar()
+
 	norm := normalize.New(pool, rdb, normalize.DefaultConfig())
 
 	hub := stream.New(pool, stream.DefaultConfig())
@@ -198,7 +202,7 @@ func main() {
 		coord.RegisterHTTP(mux)
 	}
 
-	rest.Register(mux, pool)
+	rest.Register(mux, pool, holidayCal)
 
 	mux.HandleFunc("GET /stream", hub.HandleStream)
 
@@ -222,4 +226,33 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+func loadHolidayCalendar() *marketstatus.Calendar {
+	seen := make(map[string]struct{})
+	paths := make([]string, 0, 4)
+	if v := strings.TrimSpace(os.Getenv("MARKET_HOLIDAYS_PATH")); v != "" {
+		seen[v] = struct{}{}
+		paths = append(paths, v)
+	}
+	for _, p := range []string{"/etc/papertrading/holidays.json", "infra/seed/holidays.json"} {
+		if _, dup := seen[p]; dup {
+			continue
+		}
+		seen[p] = struct{}{}
+		paths = append(paths, p)
+	}
+	for _, p := range paths {
+		cal, err := marketstatus.TryLoadCalendar(p)
+		if err != nil {
+			log.Printf("md: holidays file %q: %v", p, err)
+			continue
+		}
+		if cal != nil {
+			log.Printf("md: NSE_EQ holidays loaded from %q (%d days)", p, cal.HolidayCount())
+			return cal
+		}
+	}
+	log.Printf("md: no holidays file found (optional MARKET_HOLIDAYS_PATH / infra/seed/holidays.json)")
+	return nil
 }
