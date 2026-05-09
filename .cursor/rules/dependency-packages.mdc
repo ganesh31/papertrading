@@ -1,0 +1,26 @@
+---
+description: Vet dependencies; confirm before adding new packages
+alwaysApply: true
+---
+
+# Dependencies — maintenance and approval
+
+## Before adding a new dependency
+
+1. **Do not add abandoned or deprecated packages.** Check maintenance signals first:
+   - **Go**: `pkg.go.dev` published dates; README archive notices; deprecation warnings on imports (e.g. “Deprecated: use X”).
+   - **npm**: `deprecated` warnings on the registry page or install output; last publish date; open security advisories.
+   - **General**: GitHub archive status, stale issues without releases, official replacements named in README.
+
+2. **Prefer canonical forks.** If upstream deprecates in favour of a named successor (repo moved / fork maintained by vendor), use the successor unless the user rejects it.
+
+3. **Confirmation workflow** — before editing manifests (`package.json`, `go.mod`, `requirements.txt`, `Cargo.toml`, etc.) to **introduce** a **new direct dependency**:
+   - Share **one canonical link** with the user: GitHub repo, npm package URL, or `go.pkg.dev` module path plus repo link if different.
+   - Briefly state **why** this dependency fits (one sentence).
+   - **Wait for explicit user confirmation** (“yes”, “approved”, etc.) before running install/`go get`/changing lockfiles for that package.
+
+   **Exceptions**: typo fixes, version bumps on packages already in the repo, or security patches the user asked for explicitly — still verify not deprecated when swapping libs.
+
+4. **If unsure**, propose alternatives or stick to stdlib / existing stack rather than guessing.
+
+This complements `.cursor/rules/conventional-commits.mdc` and `.cursorrules` (commits stay emoji/body-width compliant).

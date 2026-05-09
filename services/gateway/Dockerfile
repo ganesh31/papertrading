@@ -2,12 +2,14 @@ FROM node:20-alpine AS build
 
 WORKDIR /repo
 RUN corepack enable
+RUN apk add --no-cache git
 
 COPY . .
 
-RUN pnpm install --frozen-lockfile
+# Container builds don't include .git (see .dockerignore); skip hooks/bootstrap scripts.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm -C services/gateway build
-RUN pnpm --filter @papertrading/gateway deploy --prod --legacy /out/gateway
+RUN pnpm --filter @papertrading/gateway deploy --prod --legacy --ignore-scripts /out/gateway
 
 FROM node:20-alpine
 WORKDIR /app

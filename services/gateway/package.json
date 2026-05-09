@@ -17,10 +17,13 @@
     "@opentelemetry/resources": "^2.1.0",
     "@opentelemetry/sdk-node": "^0.205.0",
     "@opentelemetry/semantic-conventions": "^1.28.0",
+    "@fastify/websocket": "^11.2.0",
     "fastify": "^5.4.0",
-    "prom-client": "^15.1.0"
+    "prom-client": "^15.1.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

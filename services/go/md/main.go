@@ -16,6 +16,7 @@ import (
 	"github.com/ganesh/papertrading/services/go/md/internal/normalize"
 	"github.com/ganesh/papertrading/services/go/md/internal/persist"
 	"github.com/ganesh/papertrading/services/go/md/internal/replay"
+	"github.com/ganesh/papertrading/services/go/md/internal/stream"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/prometheus/client_golang/prometheus"
@@ -117,6 +118,8 @@ func main() {
 
 	norm := normalize.New(pool, rdb, normalize.DefaultConfig())
 
+	hub := stream.New(pool, stream.DefaultConfig())
+
 	var tickBatcher *persist.Batcher
 	if pool != nil {
 		tickBatcher = persist.NewBatcher(pool, persist.DefaultConfig())
@@ -125,6 +128,7 @@ func main() {
 
 	runHooks := normalize.WrapWithNormalizer(&adapter.RunHooks{
 		OnNormalizedTick: func(ctx context.Context, t adapter.Tick) error {
+			hub.Publish(t)
 			if tickBatcher != nil {
 				return tickBatcher.Enqueue(ctx, t)
 			}
@@ -180,6 +184,8 @@ func main() {
 	if coord != nil {
 		coord.RegisterHTTP(mux)
 	}
+
+	mux.HandleFunc("GET /stream", hub.HandleStream)
 
 	srv := &http.Server{
 		Addr:              ":" + strconv.Itoa(port),
