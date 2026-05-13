@@ -1,6 +1,6 @@
 # papertrading
 
-Equity-first paper trading system for Indian markets, designed to add new asset classes as plug-in modules (NSE F&O next).
+Equity-first paper trading system for Indian markets, designed to add new asset classes as plug-in modules (NSE F&O ).
 
 ## Docs
 
