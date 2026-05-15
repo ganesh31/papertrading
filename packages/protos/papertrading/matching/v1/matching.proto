@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package papertrading.matching.v1;
+
+option go_package = "github.com/ganesh/papertrading/services/go/matching/pb/papertrading/matching/v1;matchingv1";
+
+// MatchingService is the CLOB matching engine API (Phase 2).
+// Prices are int64 in paise (₹ × 100); no floating-point money on the wire.
+service MatchingService {
+  rpc NewOrder(NewOrderRequest) returns (NewOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc ModifyOrder(ModifyOrderRequest) returns (ModifyOrderResponse);
+  rpc GetBook(GetBookRequest) returns (GetBookResponse);
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_BUY = 1;
+  SIDE_SELL = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_LIMIT = 1;
+  ORDER_TYPE_MARKET = 2;
+  ORDER_TYPE_IOC = 3;
+  ORDER_TYPE_FOK = 4;
+  ORDER_TYPE_SL = 5;
+  ORDER_TYPE_SL_M = 6;
+}
+
+message InstrumentRef {
+  // Exchange-qualified symbol, e.g. "NSE:RELIANCE".
+  string symbol = 1;
+}
+
+message NewOrderRequest {
+  // Client-supplied idempotency key (ULID/UUID string).
+  string request_id = 1;
+  string user_id = 2;
+  InstrumentRef instrument = 3;
+  Side side = 4;
+  OrderType order_type = 5;
+  // Limit price in paise; ignored or optional for pure MARKET (server uses protection vs LTP).
+  int64 price_paise = 6;
+  int64 quantity = 7;
+  int64 disclosed_qty = 8;
+  // Stop-loss trigger in paise (SL / SL-M).
+  int64 trigger_price_paise = 9;
+}
+
+message CancelOrderRequest {
+  string request_id = 1;
+  string user_id = 2;
+  string order_id = 3;
+}
+
+message ModifyOrderRequest {
+  string request_id = 1;
+  string user_id = 2;
+  string order_id = 3;
+  optional int64 new_price_paise = 4;
+  optional int64 new_quantity = 5;
+}
+
+// OrderAck is shared result shape for mutations (distinct per-RPC response types satisfy lint).
+message OrderAck {
+  bool ok = 1;
+  string order_id = 2;
+  string reject_code = 3;
+  string message = 4;
+}
+
+message NewOrderResponse {
+  OrderAck ack = 1;
+}
+
+message CancelOrderResponse {
+  OrderAck ack = 1;
+}
+
+message ModifyOrderResponse {
+  OrderAck ack = 1;
+}
+
+message GetBookRequest {
+  string symbol = 1;
+  // Levels per side (e.g. 5 for L5). Server may clamp.
+  int32 depth = 2;
+}
+
+message PriceLevel {
+  int64 price_paise = 1;
+  int64 total_quantity = 2;
+}
+
+message GetBookResponse {
+  string symbol = 1;
+  int64 sequence = 2;
+  repeated PriceLevel bids = 3;
+  repeated PriceLevel asks = 4;
+}
