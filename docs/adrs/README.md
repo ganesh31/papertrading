@@ -44,8 +44,8 @@ Links to prior art, external docs, related ADRs.
 | 0003 | Single-tenant v1, multi-tenant v2                       | Accepted | 0     |
 | 0004 | Go for the hot path                                     | Accepted | 0     |
 | 0005 | Broker-adapter abstraction                              | Accepted | 1     |
-| 0006 | Per-symbol actor model for matching (planned)           | Proposed | 2     |
-| 0007 | Skiplist order book; ladder alternative noted (planned) | Proposed | 2     |
+| 0006 | Per-symbol actor model for matching                     | Accepted | 2     |
+| 0007 | Skiplist order book; ladder alternative noted           | Accepted | 2     |
 | 0008 | Reject-reason taxonomy (planned)                        | Proposed | 3     |
 | 0009 | Projections as derived state (planned)                  | Proposed | 4     |
 | 0010 | FE state split (planned)                                | Proposed | 5     |
